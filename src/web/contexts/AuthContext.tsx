@@ -85,7 +85,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (u) {
-        setLoading(true); // Prevent premature routing while profile is loading
         setUser(u);
         try {
           const p = await loadProfile(u);
