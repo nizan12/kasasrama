@@ -1,43 +1,37 @@
 {
-  "name": "qris-dinamis",
-  "version": "2.0.0",
-  "description": "QRIS Static to Dynamic converter — parse, validate, and convert Indonesian QRIS payment codes",
+  "name": "uangkas-asrama",
+  "version": "1.0.0",
+  "description": "Aplikasi Web Pembayaran Uang Kas Asrama — pencatatan pembayaran kas penghuni asrama",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview",
-    "cli": "tsx src/cli.ts"
+    "preview": "vite preview"
   },
   "keywords": [
-    "qris",
-    "qr-code",
-    "payment",
-    "indonesia",
-    "emvco",
-    "gpn"
+    "uang-kas",
+    "asrama",
+    "pembayaran",
+    "firebase"
   ],
   "author": "Gidhan",
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/verssache/qris-dinamis"
-  },
   "dependencies": {
+    "@types/qrcode": "^1.5.6",
+    "firebase": "^11.0.0",
     "jsqr": "^1.4.0",
     "qrcode": "^1.5.4",
     "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "react-dom": "^19.2.4",
+    "react-router-dom": "^7.6.1"
   },
   "devDependencies": {
-    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
     "autoprefixer": "^10.4.27",
     "postcss": "^8.5.8",
     "tailwindcss": "^3.4.19",
-    "tsx": "^4.21.0",
     "typescript": "^6.0.2",
     "vite": "^8.0.3"
   }

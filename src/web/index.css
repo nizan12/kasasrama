@@ -3,7 +3,67 @@
 @tailwind utilities;
 
 @layer base {
-  * {
-    @apply border-gray-200 dark:border-gray-800;
+  body {
+    @apply bg-[#f8fafc] text-slate-800 antialiased;
+    font-family: 'Plus Jakarta Sans', 'Outfit', sans-serif;
+  }
+  
+  /* Smooth scrollbar */
+  ::-webkit-scrollbar {
+    @apply w-1.5 h-1.5;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-200 rounded-full hover:bg-slate-300 transition-colors;
+  }
+}
+
+@layer components {
+  /* Ultra-Premium Light Theme Card */
+  .premium-card {
+    @apply bg-white border border-slate-100 rounded-3xl;
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.04), 
+                0 1px 3px rgba(0, 0, 0, 0.02);
+  }
+
+  .premium-card-hover {
+    @apply premium-card transition-all duration-300 ease-out hover:scale-[1.01] hover:bg-white hover:border-slate-200/80;
+    hover-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.08);
+  }
+
+  /* Premium Buttons */
+  .btn-premium-primary {
+    @apply px-6 py-3.5 rounded-2xl font-bold text-white transition-all duration-300 ease-out 
+           bg-gradient-to-r from-indigo-600 to-violet-600 
+           hover:opacity-95 hover:shadow-[0_8px_25px_rgba(99,102,241,0.25)] hover:scale-[1.01]
+           active:scale-100 disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .btn-premium-secondary {
+    @apply px-6 py-3.5 rounded-2xl font-bold text-slate-600 bg-slate-50 border border-slate-200/80 
+           transition-all duration-300 ease-out 
+           hover:bg-slate-100 hover:text-slate-900 hover:border-slate-300 hover:scale-[1.01];
+  }
+
+  .btn-premium-danger {
+    @apply px-6 py-3.5 rounded-2xl font-bold text-white transition-all duration-300 ease-out 
+           bg-gradient-to-r from-rose-500 to-red-500 
+           hover:opacity-95 hover:shadow-[0_8px_25px_rgba(244,63,94,0.2)] hover:scale-[1.01]
+           active:scale-100;
+  }
+
+  .btn-premium-success {
+    @apply px-6 py-3.5 rounded-2xl font-bold text-white transition-all duration-300 ease-out 
+           bg-gradient-to-r from-emerald-500 to-teal-500 
+           hover:opacity-95 hover:shadow-[0_8px_25px_rgba(16,185,129,0.2)] hover:scale-[1.01]
+           active:scale-100;
+  }
+
+  /* Input fields */
+  .input-premium {
+    @apply w-full px-4 py-3.5 rounded-2xl bg-white border border-slate-200 text-slate-800 placeholder-slate-400 
+           transition-all duration-300 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5;
   }
 }

@@ -17,7 +17,6 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
     "paths": {
-      "@core/*": ["./src/core/*"],
       "@web/*": ["./src/web/*"]
     }
   },
