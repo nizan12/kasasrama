@@ -51,7 +51,7 @@ export function CustomSelect({ options, value, onChange, placeholder = "Pilih op
         type="button"
         disabled={disabled}
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full text-left px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium transition-all shadow-sm shadow-slate-100 flex items-center justify-between ${
+        className={`w-full text-left px-4 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-medium transition-all shadow-sm shadow-slate-100 flex items-center justify-between ${
           disabled ? "opacity-60 cursor-not-allowed bg-slate-50" : "hover:border-indigo-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 cursor-pointer"
         } ${isOpen ? "border-indigo-500 ring-4 ring-indigo-500/10" : ""}`}
       >

@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import type { PaymentFrequency } from "../utils/schedule";
 import { getFrequencyLabel, getPeriods } from "../utils/schedule";
 import { CustomSelect } from "../components/CustomSelect";
 import { Skeleton } from "../components/Skeleton";
+import { Modal } from "../components/Modal";
 
 interface Payment {
   id: string;
@@ -28,33 +29,12 @@ export function PaymentHistoryPage() {
   const [search, setSearch] = useState("");
   const [frequency, setFrequency] = useState<PaymentFrequency>("monthly");
   const [selectedPeriod, setSelectedPeriod] = useState("all");
-  const [selectedMonth, setSelectedMonth] = useState("all");
   const [periods, setPeriods] = useState<{ key: string; label: string }[]>([]);
   const [viewingImage, setViewingImage] = useState<string | null>(null);
-  const [imageVisible, setImageVisible] = useState(false);
-  const [imageRendered, setImageRendered] = useState(false);
+  const imageRef = useRef<string>("");
+  if (viewingImage) imageRef.current = viewingImage; // preserve during close animation
 
-  useEffect(() => {
-    let timeoutId: number;
-    if (viewingImage) {
-      setImageRendered(true);
-      document.body.style.overflow = "hidden";
-      timeoutId = window.setTimeout(() => setImageVisible(true), 10);
-    } else {
-      setImageVisible(false);
-      document.body.style.overflow = "";
-      timeoutId = window.setTimeout(() => setImageRendered(false), 300);
-    }
-    return () => {
-      clearTimeout(timeoutId);
-      document.body.style.overflow = "";
-    };
-  }, [viewingImage]);
-
-  const closeImageViewer = () => {
-    setImageVisible(false);
-    setTimeout(() => setViewingImage(null), 300);
-  };
+  const closeImageViewer = () => setViewingImage(null);
 
   const formatCurrency = (n: number) =>
     new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -96,11 +76,9 @@ export function PaymentHistoryPage() {
 
   useEffect(() => { loadPayments(); }, [loadPayments]);
 
-  const filtered = payments.filter((p) => {
-    const matchName = p.residentName.toLowerCase().includes(search.toLowerCase());
-    const matchMonth = selectedMonth === "all" || (p.paidAt && new Date(p.paidAt.seconds * 1000).getMonth() === parseInt(selectedMonth));
-    return matchName && matchMonth;
-  });
+  const filtered = payments.filter((p) =>
+    p.residentName.toLowerCase().includes(search.toLowerCase())
+  );
 
   const totalAmount = filtered.reduce((s, p) => s + p.amount, 0);
 
@@ -137,17 +115,6 @@ export function PaymentHistoryPage() {
             value={selectedPeriod} 
             onChange={setSelectedPeriod} 
             placeholder="Pilih Periode"
-          />
-        </div>
-        <div className="w-full sm:w-48">
-          <CustomSelect 
-            options={[
-              { value: "all", label: "Semua Bulan" },
-              ...monthNames.map((m, i) => ({ value: i.toString(), label: m }))
-            ]}
-            value={selectedMonth} 
-            onChange={setSelectedMonth} 
-            placeholder="Pilih Bulan"
           />
         </div>
       </div>
@@ -221,28 +188,10 @@ export function PaymentHistoryPage() {
         )}
       </div>
 
-      {/* Image Viewer Modal */}
-      {imageRendered && (
-        <div 
-          className={`fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm transition-opacity duration-300 ${imageVisible ? "opacity-100" : "opacity-0"}`} 
-          onClick={closeImageViewer}
-        >
-          <div 
-            className={`relative max-w-3xl w-full flex flex-col items-center gap-4 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${imageVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-8"}`} 
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button 
-              onClick={closeImageViewer}
-              className="absolute -top-12 right-0 p-2 text-white/70 hover:text-white transition-colors"
-            >
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-            {viewingImage && <img src={viewingImage} alt="Bukti Pembayaran" className="max-h-[85vh] rounded-2xl shadow-2xl bg-white object-contain" />}
-          </div>
-        </div>
-      )}
+      {/* Image Viewer Modal — standard Modal component */}
+      <Modal isOpen={!!viewingImage} onClose={closeImageViewer} title="Bukti Pembayaran" size="lg">
+        <img src={imageRef.current} alt="Bukti Pembayaran" className="w-full max-h-[70vh] object-contain rounded-2xl" />
+      </Modal>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { db } from "../firebase";
+import { db, storage } from "../firebase";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import type { PaymentFrequency } from "../utils/schedule";
 import { getFrequencyLabel } from "../utils/schedule";
 import { parseQRIS, validateQRIS } from "../../core";
@@ -23,7 +24,10 @@ export function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [qrisError, setQrisError] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   const formatCurrency = (n: number) =>
     new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -38,6 +42,7 @@ export function SettingsPage() {
           setMonthlyFee(String(d.monthlyFee || ""));
           setQrisString(d.qrisString || "");
           setQrisImage(d.qrisImage || "");
+          setLogoUrl(d.logoUrl || "");
           setFrequency((d.frequency as PaymentFrequency) || "monthly");
           setDueDay(d.dueDay ?? 10);
 
@@ -133,10 +138,38 @@ export function SettingsPage() {
         dueDay,
         qrisString,
         qrisImage,
+        logoUrl,
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (err) { console.error(err); } finally { setLoading(false); setSaving(false); }
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { alert("Ukuran file maksimal 2MB"); return; }
+    setUploadingLogo(true);
+    try {
+      const storageRef = ref(storage, `logos/asrama-logo`);
+      await uploadBytes(storageRef, file);
+      const downloadUrl = await getDownloadURL(storageRef);
+      setLogoUrl(downloadUrl);
+    } catch (err) {
+      console.error("Upload logo gagal:", err);
+      alert("Upload logo gagal. Pastikan Firebase Storage sudah diaktifkan.");
+    } finally {
+      setUploadingLogo(false);
+      if (logoInputRef.current) logoInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveLogo = async () => {
+    try {
+      await deleteObject(ref(storage, `logos/asrama-logo`));
+    } catch { /* file mungkin sudah tidak ada */ }
+    setLogoUrl("");
+    if (logoInputRef.current) logoInputRef.current.value = "";
   };
 
 
@@ -340,6 +373,65 @@ export function SettingsPage() {
               </div>
               <input ref={fileInputRef} type="file" accept="image/*" onChange={handleQrisUpload} className="hidden" />
             </div>
+          )}
+        </div>
+
+        {/* Logo Asrama */}
+        <div className="premium-card p-6 space-y-4">
+          <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+            <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            Logo Asrama
+          </h2>
+          <p className="text-xs text-slate-500 font-medium">Logo akan tampil di sidebar aplikasi. Ukuran ideal persegi (1:1), format PNG/JPG.</p>
+
+          {uploadingLogo ? (
+            <div className="flex items-center gap-3 py-4">
+              <svg className="w-5 h-5 animate-spin text-indigo-500" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              <span className="text-sm font-bold text-slate-500">Mengupload logo...</span>
+            </div>
+          ) : logoUrl ? (
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-2xl border border-slate-200 overflow-hidden bg-slate-50 flex items-center justify-center flex-shrink-0">
+                <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
+              </div>
+              <div className="flex flex-col gap-2">
+                <span className="text-xs text-emerald-600 font-bold flex items-center gap-1">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                  Logo terpasang
+                </span>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => logoInputRef.current?.click()} className="text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-xl border border-indigo-100 transition-all">
+                    Ganti Logo
+                  </button>
+                  <button type="button" onClick={handleRemoveLogo} className="text-xs font-bold text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-xl border border-rose-100 transition-all">
+                    Hapus
+                  </button>
+                </div>
+              </div>
+              <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="w-full border-2 border-dashed border-slate-200 rounded-2xl py-6 flex flex-col items-center gap-2 hover:border-indigo-300 hover:bg-indigo-50/30 transition-all cursor-pointer"
+              onClick={() => logoInputRef.current?.click()}
+            >
+              <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div className="text-center">
+                <p className="text-sm text-slate-700 font-bold">Upload Logo Asrama</p>
+                <p className="text-[11px] text-slate-400 font-semibold mt-0.5">PNG, JPG — Maks. 2MB</p>
+              </div>
+              <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+            </button>
           )}
         </div>
 

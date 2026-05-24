@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "../contexts/AuthContext";
@@ -22,6 +22,8 @@ export function ResidentHistoryPage() {
   const [loading, setLoading] = useState(true);
 
   const [viewingImage, setViewingImage] = useState<string | null>(null);
+  const imageRef = useRef<string>("");
+  if (viewingImage) imageRef.current = viewingImage; // preserve during close animation
 
   const closeImageViewer = () => setViewingImage(null);
 
@@ -140,15 +142,8 @@ export function ResidentHistoryPage() {
         )}
       </div>
 
-      {/* Image Viewer Modal — uses the standard Modal component */}
       <Modal isOpen={!!viewingImage} onClose={closeImageViewer} title="Bukti Pembayaran" size="lg">
-        {viewingImage && (
-          <img
-            src={viewingImage}
-            alt="Bukti Pembayaran"
-            className="w-full max-h-[70vh] object-contain rounded-2xl"
-          />
-        )}
+        <img src={imageRef.current} alt="Bukti Pembayaran" className="w-full max-h-[70vh] object-contain rounded-2xl" />
       </Modal>
     </div>
   );

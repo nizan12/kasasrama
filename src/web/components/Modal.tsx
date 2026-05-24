@@ -55,7 +55,7 @@ export function Modal({
   };
 
   const modalContent = (
-    <div className={`fixed inset-0 z-[9999] flex items-center justify-center p-4 transition-all duration-300 ${isVisible ? "opacity-100" : "opacity-0"}`}>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
       {/* Backdrop overlay */}
       <div
         className={`absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity duration-300 ${isVisible ? "opacity-100" : "opacity-0"}`}
