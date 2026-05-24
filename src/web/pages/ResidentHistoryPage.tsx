@@ -3,6 +3,7 @@ import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "../contexts/AuthContext";
 import { Skeleton } from "../components/Skeleton";
+import { Modal } from "../components/Modal";
 
 interface Payment {
   id: string;
@@ -20,32 +21,9 @@ export function ResidentHistoryPage() {
   const [history, setHistory] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Image viewer state with animation
   const [viewingImage, setViewingImage] = useState<string | null>(null);
-  const [imageVisible, setImageVisible] = useState(false);
-  const [imageRendered, setImageRendered] = useState(false);
 
-  useEffect(() => {
-    let timeoutId: number;
-    if (viewingImage) {
-      setImageRendered(true);
-      document.body.style.overflow = "hidden";
-      timeoutId = window.setTimeout(() => setImageVisible(true), 10);
-    } else {
-      setImageVisible(false);
-      document.body.style.overflow = "";
-      timeoutId = window.setTimeout(() => setImageRendered(false), 300);
-    }
-    return () => {
-      clearTimeout(timeoutId);
-      document.body.style.overflow = "";
-    };
-  }, [viewingImage]);
-
-  const closeImageViewer = () => {
-    setImageVisible(false);
-    setTimeout(() => setViewingImage(null), 300);
-  };
+  const closeImageViewer = () => setViewingImage(null);
 
   const formatCurrency = (n: number) =>
     new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -162,38 +140,16 @@ export function ResidentHistoryPage() {
         )}
       </div>
 
-      {/* Image Viewer Modal */}
-      {imageRendered && (
-        <div
-          className={`fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm transition-opacity duration-300 ${imageVisible ? "opacity-100" : "opacity-0"}`}
-          onClick={closeImageViewer}
-        >
-          <div
-            className={`relative max-w-3xl w-full flex flex-col items-center gap-4 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${imageVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-8"}`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-full flex items-center justify-between mb-1 px-1">
-              <span className="text-white/70 text-sm font-semibold">Bukti Pembayaran</span>
-              <button
-                onClick={closeImageViewer}
-                className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            {viewingImage && (
-              <img
-                src={viewingImage}
-                alt="Bukti Pembayaran"
-                className="max-h-[80vh] w-full rounded-2xl shadow-2xl bg-white object-contain"
-              />
-            )}
-            <p className="text-white/40 text-xs font-medium">Klik di luar gambar untuk menutup</p>
-          </div>
-        </div>
-      )}
+      {/* Image Viewer Modal — uses the standard Modal component */}
+      <Modal isOpen={!!viewingImage} onClose={closeImageViewer} title="Bukti Pembayaran" size="lg">
+        {viewingImage && (
+          <img
+            src={viewingImage}
+            alt="Bukti Pembayaran"
+            className="w-full max-h-[70vh] object-contain rounded-2xl"
+          />
+        )}
+      </Modal>
     </div>
   );
 }

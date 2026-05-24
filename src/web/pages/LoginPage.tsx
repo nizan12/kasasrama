@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -8,8 +8,16 @@ export function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const { login } = useAuth();
+  const { login, profile, user } = useAuth();
   const navigate = useNavigate();
+
+  // Navigate as soon as profile is confirmed loaded after login
+  useEffect(() => {
+    if (user && profile) {
+      if (profile.role === "admin") navigate("/", { replace: true });
+      else navigate("/beranda", { replace: true });
+    }
+  }, [user, profile, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,12 +25,8 @@ export function LoginPage() {
     setLoading(true);
 
     try {
-      const role = await login(email, password);
-      if (role === "admin") {
-        navigate("/");
-      } else {
-        navigate("/beranda");
-      }
+      await login(email, password);
+      // Navigation is handled by the useEffect above once profile loads
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code || "";
       if (code === "auth/user-not-found" || code === "auth/wrong-password" || code === "auth/invalid-credential") {
@@ -32,9 +36,9 @@ export function LoginPage() {
       } else {
         setError(`Gagal masuk. Error: ${(err as Error).message || JSON.stringify(err)}`);
       }
-    } finally {
       setLoading(false);
     }
+    // Note: don't setLoading(false) on success — useEffect navigates, unmounting this page
   };
 
   return (
@@ -135,19 +139,9 @@ export function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="btn-premium-primary w-full mt-2"
+              className={`btn-premium-primary w-full mt-2 transition-opacity ${loading ? "opacity-75 cursor-not-allowed" : ""}`}
             >
-              {loading ? (
-                <>
-                  <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  Menghubungkan...
-                </>
-              ) : (
-                "Masuk ke Dashboard"
-              )}
+              {loading ? "Menghubungkan..." : "Masuk ke Dashboard"}
             </button>
           </form>
 

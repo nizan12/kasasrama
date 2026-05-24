@@ -26,7 +26,7 @@ interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<UserRole>;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -85,6 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (u) {
+        setLoading(true);
         setUser(u);
         try {
           const p = await loadProfile(u);
@@ -104,11 +105,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return unsub;
   }, []);
 
-  const login = async (email: string, password: string): Promise<UserRole> => {
-    const cred = await signInWithEmailAndPassword(auth, email, password);
-    const p = await loadProfile(cred.user);
-    setProfile(p);
-    return p?.role || "penghuni";
+  const login = async (email: string, password: string): Promise<void> => {
+    // Only fire sign-in; onAuthStateChanged handles profile loading
+    await signInWithEmailAndPassword(auth, email, password);
   };
 
   const logout = async () => {
