@@ -35,6 +35,7 @@ export function ResidentHomePage() {
   const [totalPaidThisMonth, setTotalPaidThisMonth] = useState(0);
 
   const [frequency, setFrequency] = useState<PaymentFrequency>("monthly");
+  const [dueDay, setDueDay] = useState(1);
   const [qrisString, setQrisString] = useState(""); // Static QRIS template from settings
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState("");
   const [paymentStatus, setPaymentStatus] = useState<"unpaid" | "pending" | "confirmed">("unpaid");
@@ -124,6 +125,7 @@ export function ResidentHomePage() {
         setFrequency(freqVal);
         setBaseFee(feeVal);
         setQrisString(qrisStr);
+        setDueDay(dueDay);
       }
 
       const currentPeriodKey = getCurrentPeriodKey(freqVal);
@@ -331,6 +333,14 @@ export function ResidentHomePage() {
     }
   };
 
+  // Listen for event dispatched by Sidebar
+  useEffect(() => {
+    const handler = () => openProfileModal();
+    window.addEventListener("openProfileModal", handler);
+    return () => window.removeEventListener("openProfileModal", handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [residentName, room, avatar, rooms.length]);
+
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile?.residentId || !editName.trim() || !editRoom) return;
@@ -346,6 +356,10 @@ export function ResidentHomePage() {
       setRoom(editRoom);
       setAvatar(editAvatar);
       setShowProfileModal(false);
+      // Notify Sidebar to update avatar/name immediately
+      window.dispatchEvent(new CustomEvent("profileUpdated", {
+        detail: { name: editName.trim(), avatar: editAvatar },
+      }));
     } catch (err) {
       console.error(err);
       alert("Gagal memperbarui profil.");
@@ -357,6 +371,37 @@ export function ResidentHomePage() {
   if (loading) return <Skeleton type="residentHome" />;
 
   const activePeriodLabel = getPeriods(frequency, 1)[0]?.label || "";
+
+  // Compute next billing due date
+  const getNextDueDate = (): string => {
+    const now = new Date();
+    const monthNames = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+    const dayNames = ["Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"];
+
+    if (frequency === "monthly") {
+      // Next month's dueDay
+      const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      const maxDay = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
+      const day = Math.min(dueDay, maxDay);
+      return `${day} ${monthNames[nextMonth.getMonth()]} ${nextMonth.getFullYear()}`;
+    }
+
+    if (frequency === "weekly") {
+      // Next occurrence of dueDay (weekday) from today
+      const d = new Date(now);
+      d.setDate(d.getDate() + 1); // start from tomorrow
+      while (d.getDay() !== dueDay) d.setDate(d.getDate() + 1);
+      return `${d.getDate()} ${monthNames[d.getMonth()]} ${d.getFullYear()} (${dayNames[d.getDay()]})`;
+    }
+
+    if (frequency === "daily") {
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      return `${tomorrow.getDate()} ${monthNames[tomorrow.getMonth()]} ${tomorrow.getFullYear()}`;
+    }
+
+    return "-";
+  };
 
   return (
     <div className="space-y-6 pt-12 lg:pt-0 w-full fade-in">
@@ -376,15 +421,6 @@ export function ResidentHomePage() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button 
-            onClick={openProfileModal}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:text-slate-800 hover:border-slate-300 transition-colors shadow-sm shadow-slate-100"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-            Edit Profil
-          </button>
           <span className="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold bg-indigo-50 text-indigo-600 border border-indigo-100 flex-col sm:flex-row sm:gap-1.5 items-end sm:items-center">
             <span>Kas {getFrequencyLabel(frequency)}: {formatCurrency(dynamicFee)}</span>
             {feeCount > 1 && (
@@ -413,6 +449,12 @@ export function ResidentHomePage() {
                   <p className="text-slate-500 text-xs leading-normal max-w-sm mx-auto font-medium">
                     Terima kasih! Pembayaran kas Anda periode <span className="font-bold text-slate-800">{activePeriodLabel}</span> telah diverifikasi oleh pengelola asrama.
                   </p>
+                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-bold">
+                    <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    Tagihan berikutnya jatuh pada: {getNextDueDate()}
+                  </div>
                 </div>
               ) : paymentStatus === "pending" ? (
                 <div className="py-6 text-center space-y-3">

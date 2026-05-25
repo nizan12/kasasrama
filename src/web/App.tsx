@@ -14,6 +14,7 @@ import { ResidentCalendarPage } from "./pages/ResidentCalendarPage";
 import { RoomsPage } from "./pages/RoomsPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { ExpensesPage } from "./pages/ExpensesPage";
+import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
 import type { ReactNode } from "react";
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -21,20 +22,11 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f8fafc] relative overflow-hidden">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-indi                           go-500/5 rounded-full blur-[100px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-500/5 rounded-full blur-[100px]" />
-
-        <div className="text-center relative z-10 space-y-4">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4 bg-gradient-to-tr from-indigo-600 to-violet-600 p-[1px] shadow-lg shadow-indigo-500/10">
-            <div className="w-full h-full bg-white rounded-2xl flex items-center justify-center">
-              <svg className="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-          </div>
-          <p className="text-slate-400 text-sm font-bold tracking-wide uppercase">Memuat Portal...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-[#f8fafc]">
+        <svg className="w-10 h-10 animate-spin text-indigo-500" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+          <path className="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
       </div>
     );
   }
@@ -94,6 +86,7 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
           <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
+          <Route path="/lupa-password" element={<PublicRoute><ForgotPasswordPage /></PublicRoute>} />
 
           {/* Admin routes */}
           <Route path="/" element={<ProtectedRoute><AdminRoute><Layout /></AdminRoute></ProtectedRoute>}>

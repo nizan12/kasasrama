@@ -126,17 +126,35 @@ export function Sidebar() {
     }
     return () => clearTimeout(timeoutId);
   }, [mobileOpen]);
-  const { logout, user, profile } = useAuth();
+  const { logout, user, profile, logoUrl } = useAuth();
   const navigate = useNavigate();
 
   const isAdmin = profile?.role === "admin";
   const menuItems = isAdmin ? adminMenuItems : residentMenuItems;
-  const [logoUrl, setLogoUrl] = useState("");
+  const [residentName, setResidentName] = useState("");
+  const [residentAvatar, setResidentAvatar] = useState("");
 
+  // Fetch resident name + avatar for penghuni
   useEffect(() => {
-    getDoc(doc(db, "settings", "config")).then((snap) => {
-      if (snap.exists()) setLogoUrl(snap.data().logoUrl || "");
-    }).catch(() => {});
+    if (!isAdmin && profile?.residentId) {
+      getDoc(doc(db, "residents", profile.residentId)).then((snap) => {
+        if (snap.exists()) {
+          setResidentName(snap.data().name || "");
+          setResidentAvatar(snap.data().avatar || "");
+        }
+      }).catch(() => {});
+    }
+  }, [isAdmin, profile?.residentId]);
+
+  // Live-update when profile is saved from the modal
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ name: string; avatar: string }>).detail;
+      if (detail.name !== undefined) setResidentName(detail.name);
+      if (detail.avatar !== undefined) setResidentAvatar(detail.avatar);
+    };
+    window.addEventListener("profileUpdated", handler);
+    return () => window.removeEventListener("profileUpdated", handler);
   }, []);
 
   const handleLogout = async () => {
@@ -174,15 +192,15 @@ export function Sidebar() {
       >
         {/* Brand logo */}
         <div className="flex items-center gap-3.5 px-6 py-6 border-b border-slate-100">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-gradient-to-tr from-indigo-600 to-violet-600 shadow-md shadow-indigo-600/10 flex-shrink-0 overflow-hidden">
-            {logoUrl ? (
-              <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
-            ) : (
+          {logoUrl ? (
+            <img src={logoUrl} alt="Logo" className="w-9 h-9 object-contain flex-shrink-0" />
+          ) : (
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-gradient-to-tr from-indigo-600 to-violet-600 shadow-md shadow-indigo-600/10 flex-shrink-0">
               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-            )}
-          </div>
+            </div>
+          )}
           <div>
             <h1 className="text-base font-extrabold tracking-tight text-slate-900 leading-none">Uang Kas</h1>
             <p className="text-[10px] text-indigo-600 font-bold tracking-wider mt-1 uppercase">Portal Asrama</p>
@@ -225,22 +243,52 @@ export function Sidebar() {
 
         {/* Sidebar Footer */}
         <div className="p-4 border-t border-slate-100 bg-slate-50/30 space-y-3">
-          {/* User Email & info */}
-          <div className="flex items-center gap-3 px-3 py-2">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center border flex-shrink-0 ${
-              isAdmin 
-                ? "bg-indigo-50 text-indigo-600 border-indigo-100" 
-                : "bg-emerald-50 text-emerald-600 border-emerald-100"
-            }`}>
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          {/* User info — clickable for penghuni to edit profile */}
+          {isAdmin ? (
+            <div className="flex items-center gap-3 px-3 py-2">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center border bg-indigo-50 text-indigo-600 border-indigo-100 flex-shrink-0">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-slate-700 truncate font-bold">{user?.email || "User"}</p>
+                <p className="text-[10px] text-slate-400 font-semibold truncate">Sesi Aktif</p>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent("openProfileModal"));
+                setMobileOpen(false);
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-2xl hover:bg-emerald-50 hover:border-emerald-100 border border-transparent transition-all group text-left"
+            >
+              {residentAvatar ? (
+                <img src={residentAvatar} alt={residentName} className="w-8 h-8 rounded-full object-cover border border-emerald-100 flex-shrink-0" />
+              ) : residentName ? (
+                <div className="w-8 h-8 rounded-full flex items-center justify-center bg-emerald-100 text-emerald-700 text-sm font-bold flex-shrink-0">
+                  {residentName.charAt(0).toUpperCase()}
+                </div>
+              ) : (
+                <div className="w-8 h-8 rounded-full flex items-center justify-center border bg-emerald-50 text-emerald-600 border-emerald-100 flex-shrink-0">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-slate-700 truncate font-bold group-hover:text-emerald-700 transition-colors">
+                  {residentName || user?.email || "Penghuni"}
+                </p>
+                <p className="text-[10px] text-slate-400 font-semibold truncate">{user?.email}</p>
+              </div>
+              <svg className="w-3.5 h-3.5 text-slate-300 group-hover:text-emerald-500 transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs text-slate-700 truncate font-bold">{user?.email || "User"}</p>
-              <p className="text-[10px] text-slate-400 font-semibold truncate">Sesi Aktif</p>
-            </div>
-          </div>
+            </button>
+          )}
 
           {/* Logout button */}
           <button

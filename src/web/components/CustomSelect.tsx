@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 
 interface Option {
   value: string;
@@ -15,14 +16,30 @@ interface CustomSelectProps {
 
 export function CustomSelect({ options, value, onChange, placeholder = "Pilih opsi...", disabled = false }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
   const [isRendered, setIsRendered] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   const selectedOption = options.find((opt) => opt.value === value);
+
+  // Compute dropdown position from trigger button rect
+  const updatePosition = () => {
+    if (!buttonRef.current) return;
+    const rect = buttonRef.current.getBoundingClientRect();
+    setDropdownStyle({
+      position: "fixed",
+      top: rect.bottom + 4,
+      left: rect.left,
+      width: rect.width,
+      zIndex: 9999,
+    });
+  };
 
   useEffect(() => {
     let timeoutId: number;
     if (isOpen) {
+      updatePosition();
       setIsRendered(true);
       timeoutId = window.setTimeout(() => setIsVisible(true), 10);
     } else {
@@ -30,24 +47,67 @@ export function CustomSelect({ options, value, onChange, placeholder = "Pilih op
       timeoutId = window.setTimeout(() => setIsRendered(false), 200);
     }
     return () => clearTimeout(timeoutId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
-  const [isVisible, setIsVisible] = useState(false);
-
+  // Close on scroll / resize
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
+    if (!isOpen) return;
+    const close = () => setIsOpen(false);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
     };
-    
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isOpen]);
+
+  // Close on outside click
+  useEffect(() => {
+    const handle = (e: MouseEvent) => {
+      if (buttonRef.current && buttonRef.current.contains(e.target as Node)) return;
+      setIsOpen(false);
+    };
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
   }, []);
 
+  const dropdown = isRendered && (
+    <div
+      style={dropdownStyle}
+      className={`bg-white border border-slate-100 rounded-xl shadow-xl shadow-slate-200/50 max-h-60 overflow-y-auto transition-all duration-200 ease-out origin-top ${isVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 -translate-y-2"}`}
+    >
+      {options.length === 0 ? (
+        <div className="px-4 py-3 text-sm text-slate-400 text-center">Data tidak tersedia</div>
+      ) : (
+        <div className="p-1.5 flex flex-col gap-0.5">
+          {options.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault(); // prevent blur before click registers
+                onChange(option.value);
+                setIsOpen(false);
+              }}
+              className={`w-full text-left px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                value === option.value
+                  ? "bg-indigo-50 text-indigo-600"
+                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   return (
-    <div className="relative w-full" ref={containerRef}>
+    <div className="relative w-full">
       <button
+        ref={buttonRef}
         type="button"
         disabled={disabled}
         onClick={() => setIsOpen(!isOpen)}
@@ -68,33 +128,7 @@ export function CustomSelect({ options, value, onChange, placeholder = "Pilih op
         </svg>
       </button>
 
-      {isRendered && (
-        <div className={`absolute top-full left-0 right-0 z-[100] mt-1 bg-white border border-slate-100 rounded-xl shadow-xl shadow-slate-200/50 max-h-60 overflow-y-auto transition-all duration-200 ease-out origin-top ${isVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 -translate-y-2"}`}>
-          {options.length === 0 ? (
-            <div className="px-4 py-3 text-sm text-slate-400 text-center">Data tidak tersedia</div>
-          ) : (
-            <div className="p-1.5 flex flex-col gap-0.5">
-              {options.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => {
-                    onChange(option.value);
-                    setIsOpen(false);
-                  }}
-                  className={`w-full text-left px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                    value === option.value
-                      ? "bg-indigo-50 text-indigo-600"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      {createPortal(dropdown, document.body)}
     </div>
   );
 }

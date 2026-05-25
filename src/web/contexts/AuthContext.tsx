@@ -26,6 +26,7 @@ interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
   loading: boolean;
+  logoUrl: string;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -42,6 +43,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [logoUrl, setLogoUrl] = useState("");
+
+  // Load logo once on mount — available on login page and all protected pages
+  useEffect(() => {
+    getDoc(doc(db, "settings", "config")).then((snap) => {
+      if (snap.exists()) setLogoUrl(snap.data().logoUrl || "");
+    }).catch(() => {});
+  }, []);
 
   // Load user profile from Firestore
   const loadProfile = async (u: User): Promise<UserProfile | null> => {
@@ -116,7 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, profile, loading, logoUrl, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

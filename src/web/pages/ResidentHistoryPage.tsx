@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "../contexts/AuthContext";
@@ -20,10 +20,12 @@ export function ResidentHistoryPage() {
   const { profile } = useAuth();
   const [history, setHistory] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "confirmed" | "pending">("all");
 
   const [viewingImage, setViewingImage] = useState<string | null>(null);
   const imageRef = useRef<string>("");
-  if (viewingImage) imageRef.current = viewingImage; // preserve during close animation
+  if (viewingImage) imageRef.current = viewingImage;
 
   const closeImageViewer = () => setViewingImage(null);
 
@@ -49,7 +51,27 @@ export function ResidentHistoryPage() {
     loadData();
   }, [loadData]);
 
+  const filtered = useMemo(() => {
+    let list = history;
+    if (statusFilter !== "all") list = list.filter((h) => h.status === statusFilter);
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter(
+        (h) =>
+          h.periodLabel.toLowerCase().includes(q) ||
+          (h.note || "").toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [history, statusFilter, search]);
+
   if (loading) return <Skeleton type="residentHistory" />;
+
+  const statusTabs: { key: "all" | "confirmed" | "pending"; label: string; count: number }[] = [
+    { key: "all", label: "Semua", count: history.length },
+    { key: "confirmed", label: "Lunas", count: history.filter((h) => h.status === "confirmed").length },
+    { key: "pending", label: "Verifikasi", count: history.filter((h) => h.status === "pending").length },
+  ];
 
   return (
     <div className="space-y-6 pt-12 lg:pt-0 w-full fade-in">
@@ -63,15 +85,73 @@ export function ResidentHistoryPage() {
         <p className="text-slate-500 text-sm mt-1 font-medium">Seluruh riwayat pembayaran kas asrama Anda.</p>
       </div>
 
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        {/* Search */}
+        <div className="relative flex-1">
+          <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Cari periode atau catatan..."
+            className="input-premium pl-10 text-sm text-slate-800 w-full"
+          />
+          {search && (
+            <button onClick={() => setSearch("")} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          )}
+        </div>
+
+        {/* Status tabs */}
+        <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl flex-shrink-0">
+          {statusTabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setStatusFilter(tab.key)}
+              className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                statusFilter === tab.key
+                  ? "bg-white text-slate-800 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              {tab.label}
+              <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold ${
+                statusFilter === tab.key
+                  ? tab.key === "confirmed" ? "bg-emerald-100 text-emerald-600"
+                    : tab.key === "pending" ? "bg-amber-100 text-amber-600"
+                    : "bg-indigo-100 text-indigo-600"
+                  : "bg-slate-200 text-slate-500"
+              }`}>
+                {tab.count}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="premium-card p-0 bg-white border border-slate-100 overflow-hidden">
-        {history.length === 0 ? (
+        {filtered.length === 0 ? (
           <div className="text-center py-16">
             <span className="inline-block p-4 rounded-full bg-slate-50 text-slate-400 mb-2">
               <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
             </span>
-            <p className="text-slate-500 text-sm mt-3 font-semibold">Belum ada riwayat pembayaran.</p>
+            <p className="text-slate-500 text-sm mt-3 font-semibold">
+              {history.length === 0 ? "Belum ada riwayat pembayaran." : "Tidak ada data yang cocok dengan filter."}
+            </p>
+            {(search || statusFilter !== "all") && (
+              <button
+                onClick={() => { setSearch(""); setStatusFilter("all"); }}
+                className="mt-3 text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors"
+              >
+                Reset filter
+              </button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -87,7 +167,7 @@ export function ResidentHistoryPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
-                {history.map((h) => (
+                {filtered.map((h) => (
                   <tr key={h.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="font-bold text-slate-800 text-sm">{h.periodLabel}</span>

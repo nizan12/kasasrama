@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { db, storage } from "../firebase";
-import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { db } from "../firebase";
 import type { PaymentFrequency } from "../utils/schedule";
 import { getFrequencyLabel } from "../utils/schedule";
 import { parseQRIS, validateQRIS } from "../../core";
@@ -25,7 +24,6 @@ export function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [qrisError, setQrisError] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
-  const [uploadingLogo, setUploadingLogo] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
@@ -145,29 +143,42 @@ export function SettingsPage() {
     } catch (err) { console.error(err); } finally { setLoading(false); setSaving(false); }
   };
 
+  // Resize to max 400px PNG — preserves transparency, no JPEG black background, good quality
+  const compressImage = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 400;
+        const scale = Math.min(MAX / img.width, MAX / img.height, 1);
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        // Fill with transparent background (PNG supports it)
+        canvas.getContext("2d")!.clearRect(0, 0, w, h);
+        canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/png"));
+      };
+      img.onerror = reject;
+      img.src = URL.createObjectURL(file);
+    });
+
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { alert("Ukuran file maksimal 2MB"); return; }
-    setUploadingLogo(true);
+    if (file.size > 5 * 1024 * 1024) { alert("Ukuran file maksimal 5MB"); return; }
     try {
-      const storageRef = ref(storage, `logos/asrama-logo`);
-      await uploadBytes(storageRef, file);
-      const downloadUrl = await getDownloadURL(storageRef);
-      setLogoUrl(downloadUrl);
-    } catch (err) {
-      console.error("Upload logo gagal:", err);
-      alert("Upload logo gagal. Pastikan Firebase Storage sudah diaktifkan.");
+      const compressed = await compressImage(file);
+      setLogoUrl(compressed);
+    } catch {
+      alert("Gagal memproses gambar. Coba format lain.");
     } finally {
-      setUploadingLogo(false);
       if (logoInputRef.current) logoInputRef.current.value = "";
     }
   };
 
-  const handleRemoveLogo = async () => {
-    try {
-      await deleteObject(ref(storage, `logos/asrama-logo`));
-    } catch { /* file mungkin sudah tidak ada */ }
+  const handleRemoveLogo = () => {
     setLogoUrl("");
     if (logoInputRef.current) logoInputRef.current.value = "";
   };
@@ -386,15 +397,7 @@ export function SettingsPage() {
           </h2>
           <p className="text-xs text-slate-500 font-medium">Logo akan tampil di sidebar aplikasi. Ukuran ideal persegi (1:1), format PNG/JPG.</p>
 
-          {uploadingLogo ? (
-            <div className="flex items-center gap-3 py-4">
-              <svg className="w-5 h-5 animate-spin text-indigo-500" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              <span className="text-sm font-bold text-slate-500">Mengupload logo...</span>
-            </div>
-          ) : logoUrl ? (
+          {logoUrl ? (
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-2xl border border-slate-200 overflow-hidden bg-slate-50 flex items-center justify-center flex-shrink-0">
                 <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
