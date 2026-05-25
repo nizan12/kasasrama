@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { collection, query, getDocs, addDoc, setDoc, doc, serverTimestamp, where } from "firebase/firestore";
+import { collection, query, getDocs, setDoc, doc, serverTimestamp, where } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import { CustomSelect } from "../components/CustomSelect";
 import { useAuth } from "../contexts/AuthContext";
@@ -69,26 +69,30 @@ export function RegisterPage() {
     setLoading(true);
 
     try {
+      // Pre-generate resident document reference locally to get the ID
+      const residentRef = doc(collection(db, "residents"));
+      const residentId = residentRef.id;
+
       // 1. Create Auth User
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       
-      // 2. Update Auth Profile (optional)
-      await updateProfile(cred.user, { displayName: name });
-      
-      // 3. Create Resident Profile in Firestore
-      const residentRef = await addDoc(collection(db, "residents"), {
-        name: name.trim(),
-        room: selectedRoom,
-        isActive: true,
-        createdAt: serverTimestamp(),
-      });
-      
-      // 4. Create User Role in Firestore
-      await setDoc(doc(db, "users", cred.user.uid), {
-        email: email.trim(),
-        role: "penghuni",
-        residentId: residentRef.id,
-      });
+      // 2. Perform database writes and Auth profile updates in parallel to minimize latency
+      await Promise.all([
+        setDoc(doc(db, "users", cred.user.uid), {
+          email: email.trim(),
+          role: "penghuni",
+          residentId: residentId,
+        }),
+        setDoc(residentRef, {
+          name: name.trim(),
+          room: selectedRoom,
+          isActive: true,
+          createdAt: serverTimestamp(),
+        }),
+        updateProfile(cred.user, { displayName: name }).catch((err) => {
+          console.error("Gagal update profile name:", err);
+        })
+      ]);
 
       // Navigate to portal
       navigate("/beranda");

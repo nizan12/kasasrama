@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { Layout } from "./components/Layout";
@@ -19,6 +20,21 @@ import type { ReactNode } from "react";
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { user, profile, loading, logout } = useAuth();
+  const [showDenied, setShowDenied] = useState(false);
+
+  useEffect(() => {
+    let timeoutId: number;
+    if (user && !profile) {
+      setShowDenied(false);
+      // Wait 2 seconds to allow profile doc creation/sync to resolve
+      timeoutId = window.setTimeout(() => {
+        setShowDenied(true);
+      }, 2000);
+    } else {
+      setShowDenied(false);
+    }
+    return () => clearTimeout(timeoutId);
+  }, [user, profile]);
 
   if (loading) {
     return (
@@ -34,6 +50,17 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   if (!user) return <Navigate to="/login" replace />;
 
   if (!profile) {
+    if (!showDenied) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-[#f8fafc]">
+          <svg className="w-10 h-10 animate-spin text-indigo-500" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+            <path className="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#f8fafc] p-6 text-center">
         <div className="bg-white p-8 rounded-2xl shadow-xl shadow-slate-100/50 max-w-sm border border-slate-100">

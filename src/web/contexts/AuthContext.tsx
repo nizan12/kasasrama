@@ -123,7 +123,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (u) => {
+    let unsubProfile: (() => void) | undefined;
+
+    const unsubAuth = onAuthStateChanged(auth, async (u) => {
+      // Clean up previous profile listener
+      if (unsubProfile) {
+        unsubProfile();
+        unsubProfile = undefined;
+      }
+
       if (u) {
         setLoading(true);
         setUser(u);
@@ -136,13 +144,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } finally {
           setLoading(false);
         }
+
+        // Set up real-time listener for future profile updates or creation
+        unsubProfile = onSnapshot(doc(db, "users", u.uid), (snap) => {
+          if (snap.exists()) {
+            setProfile(snap.data() as UserProfile);
+          }
+        }, (err) => {
+          console.error("Profile onSnapshot failed:", err);
+        });
       } else {
         setUser(null);
         setProfile(null);
         setLoading(false);
       }
     });
-    return unsub;
+
+    return () => {
+      unsubAuth();
+      if (unsubProfile) unsubProfile();
+    };
   }, []);
 
   const login = async (email: string, password: string): Promise<void> => {
