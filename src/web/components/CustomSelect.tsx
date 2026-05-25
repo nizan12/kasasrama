@@ -20,6 +20,7 @@ export function CustomSelect({ options, value, onChange, placeholder = "Pilih op
   const [isRendered, setIsRendered] = useState(false);
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const selectedOption = options.find((opt) => opt.value === value);
 
@@ -53,7 +54,10 @@ export function CustomSelect({ options, value, onChange, placeholder = "Pilih op
   // Close on scroll / resize
   useEffect(() => {
     if (!isOpen) return;
-    const close = () => setIsOpen(false);
+    const close = (e: Event) => {
+      if (dropdownRef.current && dropdownRef.current.contains(e.target as Node)) return;
+      setIsOpen(false);
+    };
     window.addEventListener("scroll", close, true);
     window.addEventListener("resize", close);
     return () => {
@@ -66,6 +70,7 @@ export function CustomSelect({ options, value, onChange, placeholder = "Pilih op
   useEffect(() => {
     const handle = (e: MouseEvent) => {
       if (buttonRef.current && buttonRef.current.contains(e.target as Node)) return;
+      if (dropdownRef.current && dropdownRef.current.contains(e.target as Node)) return;
       setIsOpen(false);
     };
     document.addEventListener("mousedown", handle);
@@ -74,6 +79,7 @@ export function CustomSelect({ options, value, onChange, placeholder = "Pilih op
 
   const dropdown = isRendered && (
     <div
+      ref={dropdownRef}
       style={dropdownStyle}
       className={`bg-white border border-slate-100 rounded-xl shadow-xl shadow-slate-200/50 max-h-60 overflow-y-auto transition-all duration-200 ease-out origin-top ${isVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 -translate-y-2"}`}
     >
