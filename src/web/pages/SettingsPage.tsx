@@ -24,6 +24,7 @@ export function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [qrisError, setQrisError] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
+  const [systemStartDate, setSystemStartDate] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
@@ -43,6 +44,7 @@ export function SettingsPage() {
           setLogoUrl(d.logoUrl || "");
           setFrequency((d.frequency as PaymentFrequency) || "monthly");
           setDueDay(d.dueDay ?? 10);
+          setSystemStartDate(d.systemStartDate || "");
 
           if (d.qrisString) {
             try {
@@ -137,6 +139,7 @@ export function SettingsPage() {
         qrisString,
         qrisImage,
         logoUrl,
+        systemStartDate,
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
@@ -298,6 +301,20 @@ export function SettingsPage() {
               Tagihan bulanan akan dikalkulasikan secara otomatis berdasarkan total hari dalam bulan tersebut.
             </div>
           )}
+
+          <div className="border-t border-slate-100 pt-4 space-y-2">
+            <label htmlFor="set-start-date" className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Tanggal Mulai Sistem Aktif</label>
+            <input 
+              id="set-start-date" 
+              type="date" 
+              value={systemStartDate} 
+              onChange={(e) => setSystemStartDate(e.target.value)} 
+              className="input-premium text-sm text-slate-800" 
+            />
+            <p className="text-[11px] text-slate-400 font-semibold leading-relaxed">
+              Tagihan kas hanya akan dihitung untuk tanggal/hari jatuh tempo yang jatuh pada atau setelah tanggal mulai ini. Berguna jika sebelumnya pembayaran dicatat secara manual.
+            </p>
+          </div>
         </div>
 
         {/* QRIS Settings */}

@@ -98,8 +98,35 @@ export function countTargetDaysInMonth(year: number, month: number, targetDayOfW
 // Calculate dynamic fee based on frequency and period.
 // baseFee = total monthly target set by admin.
 // For weekly/daily: fee per billing point = baseFee / count (divided equally).
-export function getDynamicFee(baseFee: number, freq: PaymentFrequency, periodKey: string, dueDay: number): { fee: number; count: number; feePerPoint: number } {
-  if (freq === "monthly") return { fee: baseFee, count: 1, feePerPoint: baseFee };
+export function getDynamicFee(
+  baseFee: number, 
+  freq: PaymentFrequency, 
+  periodKey: string, 
+  dueDay: number,
+  systemStartDate?: string
+): { fee: number; count: number; feePerPoint: number } {
+  if (freq === "monthly") {
+    let isValid = true;
+    if (systemStartDate) {
+      const [yearStr, monthStr] = periodKey.split("-");
+      const year = parseInt(yearStr || "0");
+      const month = parseInt(monthStr || "0");
+      if (!isNaN(year) && !isNaN(month)) {
+        const firstDay = new Date(year, month - 1, 1);
+        firstDay.setHours(0, 0, 0, 0);
+        const parsedStart = new Date(systemStartDate);
+        parsedStart.setHours(0, 0, 0, 0);
+        if (firstDay < parsedStart) {
+          const dueDayDate = new Date(year, month - 1, Math.min(dueDay, new Date(year, month, 0).getDate()));
+          dueDayDate.setHours(0, 0, 0, 0);
+          if (dueDayDate < parsedStart) {
+            isValid = false;
+          }
+        }
+      }
+    }
+    return { fee: isValid ? baseFee : 0, count: isValid ? 1 : 0, feePerPoint: isValid ? baseFee : 0 };
+  }
   
   const [yearStr, monthStr] = periodKey.split("-");
   const year = parseInt(yearStr || "0");
@@ -108,18 +135,52 @@ export function getDynamicFee(baseFee: number, freq: PaymentFrequency, periodKey
   if (isNaN(year) || isNaN(month)) return { fee: baseFee, count: 1, feePerPoint: baseFee };
 
   if (freq === "weekly") {
-    const count = countTargetDaysInMonth(year, month, dueDay);
-    // baseFee is the total monthly target — divide equally across each week
-    const feePerPoint = count > 0 ? Math.round(baseFee / count) : baseFee;
-    return { fee: baseFee, count, feePerPoint };
+    let count = 0;
+    const date = new Date(year, month - 1, 1);
+    while (date.getMonth() === month - 1) {
+      if (date.getDay() === dueDay) {
+        let isValid = true;
+        if (systemStartDate) {
+          const checkDate = new Date(date);
+          checkDate.setHours(0, 0, 0, 0);
+          const parsedStart = new Date(systemStartDate);
+          parsedStart.setHours(0, 0, 0, 0);
+          if (checkDate < parsedStart) {
+            isValid = false;
+          }
+        }
+        if (isValid) {
+          count++;
+        }
+      }
+      date.setDate(date.getDate() + 1);
+    }
+    const feePerPoint = count > 0 ? Math.round(baseFee / count) : 0;
+    const fee = count > 0 ? baseFee : 0;
+    return { fee, count, feePerPoint };
   }
   
   if (freq === "daily") {
-    // Number of days in that month
-    const count = new Date(year, month, 0).getDate();
-    // baseFee is the total monthly target — divide equally across each day
-    const feePerPoint = count > 0 ? Math.round(baseFee / count) : baseFee;
-    return { fee: baseFee, count, feePerPoint };
+    let count = 0;
+    const totalDays = new Date(year, month, 0).getDate();
+    for (let d = 1; d <= totalDays; d++) {
+      let isValid = true;
+      if (systemStartDate) {
+        const checkDate = new Date(year, month - 1, d);
+        checkDate.setHours(0, 0, 0, 0);
+        const parsedStart = new Date(systemStartDate);
+        parsedStart.setHours(0, 0, 0, 0);
+        if (checkDate < parsedStart) {
+          isValid = false;
+        }
+      }
+      if (isValid) {
+        count++;
+      }
+    }
+    const feePerPoint = count > 0 ? Math.round(baseFee / count) : 0;
+    const fee = count > 0 ? baseFee : 0;
+    return { fee, count, feePerPoint };
   }
   
   return { fee: baseFee, count: 1, feePerPoint: baseFee };

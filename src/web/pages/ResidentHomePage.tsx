@@ -36,6 +36,7 @@ export function ResidentHomePage() {
 
   const [frequency, setFrequency] = useState<PaymentFrequency>("monthly");
   const [dueDay, setDueDay] = useState(1);
+  const [systemStartDate, setSystemStartDate] = useState("");
   const [qrisString, setQrisString] = useState(""); // Static QRIS template from settings
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState("");
   const [paymentStatus, setPaymentStatus] = useState<"unpaid" | "pending" | "confirmed">("unpaid");
@@ -45,6 +46,7 @@ export function ResidentHomePage() {
   const [note, setNote] = useState("");
   const [proofImage, setProofImage] = useState("");
   const [success, setSuccess] = useState(false);
+  const [payFull, setPayFull] = useState(false);
 
   // Financial Transparency State
   const [globalIncome, setGlobalIncome] = useState(0);
@@ -115,6 +117,7 @@ export function ResidentHomePage() {
       let freqVal: PaymentFrequency = "monthly";
       let dueDay = 1;
       let qrisStr = "";
+      let systemStartDate = "";
 
       if (settingsSnap.exists()) {
         const d = settingsSnap.data();
@@ -122,14 +125,16 @@ export function ResidentHomePage() {
         freqVal = (d.frequency as PaymentFrequency) || "monthly";
         dueDay = d.dueDay ?? 1;
         qrisStr = d.qrisString || "";
+        systemStartDate = d.systemStartDate || "";
         setFrequency(freqVal);
         setBaseFee(feeVal);
         setQrisString(qrisStr);
         setDueDay(dueDay);
+        setSystemStartDate(systemStartDate);
       }
 
       const currentPeriodKey = getCurrentPeriodKey(freqVal);
-      const feeInfo = getDynamicFee(feeVal, freqVal, currentPeriodKey, dueDay);
+      const feeInfo = getDynamicFee(feeVal, freqVal, currentPeriodKey, dueDay, systemStartDate);
       setDynamicFee(feeInfo.fee);
       setFeeCount(feeInfo.count);
 
@@ -154,20 +159,42 @@ export function ResidentHomePage() {
       // Calculate accumulated outstanding:
       // Count how many billing points have passed UP TO AND INCLUDING TODAY
       const today = new Date();
+      today.setHours(0, 0, 0, 0);
       const feePerPoint = feeInfo.count > 0 ? Math.round(feeInfo.fee / feeInfo.count) : feeInfo.fee;
       let passedBillingPoints = 0;
 
+      // Determine the start date boundary for the current month
+      let startDate = new Date(currentYear, currentMonth - 1, 1);
+      startDate.setHours(0, 0, 0, 0);
+      if (systemStartDate) {
+        const parsedStart = new Date(systemStartDate);
+        parsedStart.setHours(0, 0, 0, 0);
+        if (parsedStart > startDate) {
+          startDate = parsedStart;
+        }
+      }
+
       if (freqVal === "weekly") {
-        // Count billing days that have occurred in this month up to today
-        const iter = new Date(currentYear, currentMonth - 1, 1);
+        // Count billing days that have occurred in this month on/after startDate and up to today
+        const iter = new Date(startDate);
         while (iter.getMonth() + 1 === currentMonth && iter <= today) {
           if (iter.getDay() === dueDay) passedBillingPoints++;
           iter.setDate(iter.getDate() + 1);
         }
       } else if (freqVal === "daily") {
-        passedBillingPoints = today.getDate(); // days elapsed this month
+        if (startDate <= today && startDate.getMonth() + 1 === currentMonth) {
+          const diffTime = today.getTime() - startDate.getTime();
+          const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1; // inclusive
+          passedBillingPoints = Math.max(0, diffDays);
+        } else {
+          passedBillingPoints = 0;
+        }
       } else {
-        passedBillingPoints = 1; // monthly: full amount due
+        if (startDate <= today && startDate.getMonth() + 1 === currentMonth) {
+          passedBillingPoints = 1;
+        } else {
+          passedBillingPoints = 0;
+        }
       }
 
       // Accumulated outstanding = total due for passed weeks - total already paid
@@ -187,22 +214,7 @@ export function ResidentHomePage() {
         } else {
           setPaymentStatus("unpaid");
           
-          // 5. If unpaid and static QRIS exists, generate Dynamic QRIS for this exact remaining fee
-          if (qrisStr && remainingFee > 0) {
-            try {
-              const dynamicStr = convertQRIS(qrisStr, { amount: remainingFee });
-
-              // Render to QR Data URL
-              const url = await QRCode.toDataURL(dynamicStr, {
-                margin: 1,
-                width: 300,
-                color: { dark: "#1e293b", light: "#ffffff" },
-              });
-              setQrCodeDataUrl(url);
-            } catch (err) {
-              console.error("Failed generating QR", err);
-            }
-          }
+          // 5. QRIS generation is now handled reactively by useEffect based on selected options
         }
       }
 
@@ -231,6 +243,45 @@ export function ResidentHomePage() {
     loadData();
   }, [loadData]);
 
+  const feePerPoint = feeCount > 0 ? Math.round(totalFeeThisMonth / feeCount) : totalFeeThisMonth;
+  const fullMonthRemainingAmount = Math.max(0, totalFeeThisMonth - totalPaidThisMonth);
+  // Option 1: Bayar Rutin (accumulated outstanding up to today)
+  const regularCycleAmount = dynamicFee;
+  // Option 2: Bayar Penuh (full month remaining)
+  const fullMonthAmount = fullMonthRemainingAmount;
+
+  const selectedAmount = payFull ? fullMonthAmount : regularCycleAmount;
+
+  // Generate dynamic QRIS when selectedAmount or qrisString changes
+  useEffect(() => {
+    if (!qrisString || selectedAmount <= 0) {
+      setQrCodeDataUrl("");
+      return;
+    }
+    
+    let isMounted = true;
+    const generateQR = async () => {
+      try {
+        const dynamicStr = convertQRIS(qrisString, { amount: selectedAmount });
+        const url = await QRCode.toDataURL(dynamicStr, {
+          margin: 1,
+          width: 300,
+          color: { dark: "#1e293b", light: "#ffffff" },
+        });
+        if (isMounted) {
+          setQrCodeDataUrl(url);
+        }
+      } catch (err) {
+        console.error("Failed generating QR", err);
+      }
+    };
+    
+    generateQR();
+    return () => {
+      isMounted = false;
+    };
+  }, [qrisString, selectedAmount]);
+
   const handlePayConfirm = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile?.residentId || submitting) return;
@@ -251,7 +302,7 @@ export function ResidentHomePage() {
         periodKey: currentPeriodKey,
         periodLabel: currentPeriodLabel,
         frequency,
-        amount: dynamicFee,
+        amount: selectedAmount,
         note: note.trim() || "Konfirmasi oleh penghuni",
         proofImage: proofImage,
         status: "pending", // Waiting admin verification
@@ -379,24 +430,57 @@ export function ResidentHomePage() {
     const dayNames = ["Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"];
 
     if (frequency === "monthly") {
-      // Next month's dueDay
-      const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-      const maxDay = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
+      let targetMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      if (systemStartDate) {
+        const parsedStart = new Date(systemStartDate);
+        parsedStart.setHours(0, 0, 0, 0);
+        const currentMonthDue = new Date(now.getFullYear(), now.getMonth(), Math.min(dueDay, new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()));
+        currentMonthDue.setHours(0, 0, 0, 0);
+        if (currentMonthDue >= parsedStart && now < currentMonthDue) {
+          targetMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        } else {
+          let iterMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+          while (true) {
+            const due = new Date(iterMonth.getFullYear(), iterMonth.getMonth(), Math.min(dueDay, new Date(iterMonth.getFullYear(), iterMonth.getMonth() + 1, 0).getDate()));
+            due.setHours(0, 0, 0, 0);
+            if (due >= parsedStart) {
+              targetMonth = iterMonth;
+              break;
+            }
+            iterMonth.setMonth(iterMonth.getMonth() + 1);
+          }
+        }
+      }
+      const maxDay = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 0).getDate();
       const day = Math.min(dueDay, maxDay);
-      return `${day} ${monthNames[nextMonth.getMonth()]} ${nextMonth.getFullYear()}`;
+      return `${day} ${monthNames[targetMonth.getMonth()]} ${targetMonth.getFullYear()}`;
     }
 
     if (frequency === "weekly") {
-      // Next occurrence of dueDay (weekday) from today
-      const d = new Date(now);
+      let d = new Date(now);
       d.setDate(d.getDate() + 1); // start from tomorrow
+      if (systemStartDate) {
+        const parsedStart = new Date(systemStartDate);
+        parsedStart.setHours(0, 0, 0, 0);
+        if (parsedStart > d) {
+          d = new Date(parsedStart);
+        }
+      }
       while (d.getDay() !== dueDay) d.setDate(d.getDate() + 1);
       return `${d.getDate()} ${monthNames[d.getMonth()]} ${d.getFullYear()} (${dayNames[d.getDay()]})`;
     }
 
     if (frequency === "daily") {
-      const tomorrow = new Date(now);
+      let tomorrow = new Date(now);
       tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      if (systemStartDate) {
+        const parsedStart = new Date(systemStartDate);
+        parsedStart.setHours(0, 0, 0, 0);
+        if (parsedStart > tomorrow) {
+          tomorrow = parsedStart;
+        }
+      }
       return `${tomorrow.getDate()} ${monthNames[tomorrow.getMonth()]} ${tomorrow.getFullYear()}`;
     }
 
@@ -468,34 +552,98 @@ export function ResidentHomePage() {
                 </div>
               ) : (
                 <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                      Pilih Nominal Pembayaran:
+                    </label>
+                    {fullMonthAmount > regularCycleAmount ? (
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setPayFull(false)}
+                          className={`p-3.5 rounded-2xl border text-left transition-all ${
+                            !payFull 
+                              ? "bg-indigo-50/60 border-indigo-200 ring-2 ring-indigo-500/10" 
+                              : "bg-white border-slate-200 hover:border-slate-300"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                              {regularCycleAmount > feePerPoint ? "Bayar Rutin + Tunggakan" : "Bayar Rutin"}
+                            </span>
+                            {!payFull && <span className="w-2 h-2 rounded-full bg-indigo-600" />}
+                          </div>
+                          <p className="text-base font-extrabold text-slate-800 mt-1">{formatCurrency(regularCycleAmount)}</p>
+                          <p className="text-[10px] text-slate-500 font-semibold mt-0.5">
+                            {regularCycleAmount > feePerPoint 
+                              ? "Termasuk akumulasi tunggakan" 
+                              : `Seperti biasa per ${frequency === "weekly" ? "minggu" : frequency === "daily" ? "hari" : "bulan"}`}
+                          </p>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setPayFull(true)}
+                          className={`p-3.5 rounded-2xl border text-left transition-all ${
+                            payFull 
+                              ? "bg-indigo-50/60 border-indigo-200 ring-2 ring-indigo-500/10" 
+                              : "bg-white border-slate-200 hover:border-slate-300"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Bayar Penuh</span>
+                            {payFull && <span className="w-2 h-2 rounded-full bg-indigo-600" />}
+                          </div>
+                          <p className="text-base font-extrabold text-slate-800 mt-1">{formatCurrency(fullMonthAmount)}</p>
+                          <p className="text-[10px] text-slate-500 font-semibold mt-0.5">Satu bulan penuh</p>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1">
+                        <div className="p-3.5 rounded-2xl border bg-indigo-50/60 border-indigo-200 ring-2 ring-indigo-500/10 text-left transition-all">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">Bayar Penuh (Wajib)</span>
+                            <span className="w-2 h-2 rounded-full bg-indigo-600" />
+                          </div>
+                          <p className="text-base font-extrabold text-slate-800 mt-1">{formatCurrency(fullMonthAmount)}</p>
+                          <p className="text-[10px] text-slate-500 font-semibold mt-0.5">
+                            Tunggakan telah mencapai akhir periode bulan berjalan.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   {qrCodeDataUrl ? (
                     <div className="flex flex-col md:flex-row items-center gap-6 p-4 rounded-2xl bg-slate-50 border border-slate-100">
                       <div className="p-3 bg-white border border-slate-100 rounded-2xl inline-block shadow-sm shadow-slate-100 flex-shrink-0">
                         <img src={qrCodeDataUrl} alt="Dynamic QRIS" className="w-36 h-36 object-contain" />
                       </div>
-                      <div className="space-y-2 text-center md:text-left min-w-0">
+                      <div className="space-y-2 text-center md:text-left min-w-0 flex-1">
                         <h4 className="text-sm font-extrabold text-slate-800">Scan QRIS Dinamis</h4>
                         <p className="text-xs text-slate-500 leading-normal font-medium mb-3">
-                          Scan menggunakan e-wallet (Gopay, OVO, Dana, LinkAja) or Mobile Banking.
-                          Nominal transfer otomatis terisi <span className="font-bold text-slate-700">sisa tagihan</span> Anda sebesar <span className="text-indigo-650 font-extrabold">{formatCurrency(dynamicFee)}</span>.
+                          Scan menggunakan e-wallet (Gopay, OVO, Dana, LinkAja) atau Mobile Banking.
+                          Nominal transfer otomatis terisi sebesar <span className="text-indigo-650 font-extrabold">{formatCurrency(selectedAmount)}</span>.
                         </p>
                         
-                        {totalFeeThisMonth > 0 && totalPaidThisMonth > 0 && (
-                          <div className="flex flex-col gap-1.5 mb-4 bg-white p-3 rounded-xl border border-slate-200 shadow-sm shadow-slate-50">
-                            <div className="flex justify-between items-center text-xs">
-                              <span className="text-slate-500 font-medium">Total Tagihan Bulan Ini</span>
-                              <span className="font-bold text-slate-700">{formatCurrency(totalFeeThisMonth)}</span>
-                            </div>
+                        <div className="flex flex-col gap-1.5 mb-4 bg-white p-3 rounded-xl border border-slate-200 shadow-sm shadow-slate-50">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-slate-500 font-medium">Total Tagihan Bulan Ini</span>
+                            <span className="font-bold text-slate-700">{formatCurrency(totalFeeThisMonth)}</span>
+                          </div>
+                          {totalPaidThisMonth > 0 && (
                             <div className="flex justify-between items-center text-xs">
                               <span className="text-slate-500 font-medium">Telah Dibayar</span>
                               <span className="font-bold text-emerald-600">- {formatCurrency(totalPaidThisMonth)}</span>
                             </div>
-                            <div className="flex justify-between items-center text-xs pt-1.5 border-t border-slate-100 mt-0.5">
-                              <span className="text-slate-800 font-bold">Sisa Pembayaran</span>
-                              <span className="font-extrabold text-indigo-600">{formatCurrency(dynamicFee)}</span>
-                            </div>
+                          )}
+                          <div className="flex justify-between items-center text-xs pt-1.5 border-t border-slate-100 mt-0.5">
+                            <span className="text-slate-800 font-bold">
+                              {payFull ? "Nominal Bayar Penuh" : `Nominal Bayar Rutin (${frequency === "weekly" ? "Mingguan" : frequency === "daily" ? "Harian" : "Bulanan"})`}
+                            </span>
+                            <span className="font-extrabold text-indigo-600">{formatCurrency(selectedAmount)}</span>
                           </div>
-                        )}
+                        </div>
 
                         <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
                           QRIS DINAMIS • AUTO-FEE 100% BEBAS BIAYA

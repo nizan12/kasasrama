@@ -8,6 +8,7 @@ export function AdminCalendarPage() {
   const [loading, setLoading] = useState(true);
   const [dueDayOfWeek, setDueDayOfWeek] = useState<number>(0);
   const [baseFee, setBaseFee] = useState<number>(0);
+  const [systemStartDate, setSystemStartDate] = useState<string>("");
 
   const loadData = useCallback(async () => {
     try {
@@ -16,6 +17,7 @@ export function AdminCalendarPage() {
       if (settingsSnap.exists()) {
         const d = settingsSnap.data();
         setBaseFee(d.monthlyFee || 0);
+        setSystemStartDate(d.systemStartDate || "");
         if (d.frequency === "weekly") {
           setDueDayOfWeek(d.dueDay ?? 0); // e.g., 0 for Sunday
         } else {
@@ -42,15 +44,35 @@ export function AdminCalendarPage() {
   let targetDayCount = 0;
   if (dueDayOfWeek >= 0) {
     for (let i = 1; i <= daysInMonth; i++) {
-      if (dueDayOfWeek === new Date(year, currentDate.getMonth(), i).getDay()) {
+      const thisDayDate = new Date(year, currentDate.getMonth(), i);
+      thisDayDate.setHours(0, 0, 0, 0);
+      let isValidTarget = dueDayOfWeek === thisDayDate.getDay();
+      if (isValidTarget && systemStartDate) {
+        const parsedStart = new Date(systemStartDate);
+        parsedStart.setHours(0, 0, 0, 0);
+        if (thisDayDate < parsedStart) {
+          isValidTarget = false;
+        }
+      }
+      if (isValidTarget) {
         targetDayCount++;
       }
     }
   } else {
-    targetDayCount = 1;
+    let isValidTarget = true;
+    if (systemStartDate) {
+      const thisDayDate = new Date(year, currentDate.getMonth(), 1);
+      thisDayDate.setHours(0, 0, 0, 0);
+      const parsedStart = new Date(systemStartDate);
+      parsedStart.setHours(0, 0, 0, 0);
+      if (thisDayDate < parsedStart) {
+        isValidTarget = false;
+      }
+    }
+    targetDayCount = isValidTarget ? 1 : 0;
   }
 
-  const totalFeeForMonth = targetDayCount * baseFee;
+  const totalFeeForMonth = baseFee;
 
   const prevMonth = () => {
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
@@ -72,7 +94,23 @@ export function AdminCalendarPage() {
   // Days
   for (let i = 1; i <= daysInMonth; i++) {
     const dayOfWeek = new Date(currentDate.getFullYear(), currentDate.getMonth(), i).getDay();
-    const isTargetDay = dueDayOfWeek === dayOfWeek || (dueDayOfWeek === -1 && i === 1); // If monthly, assume 1st day is target
+    let isTargetDay = dueDayOfWeek === dayOfWeek || (dueDayOfWeek === -1 && i === 1); // If monthly, assume 1st day is target
+    if (isTargetDay && systemStartDate) {
+      const thisDayDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), i);
+      thisDayDate.setHours(0, 0, 0, 0);
+      const parsedStart = new Date(systemStartDate);
+      parsedStart.setHours(0, 0, 0, 0);
+      if (thisDayDate < parsedStart) {
+        isTargetDay = false;
+      }
+    }
+    if (isTargetDay) {
+      targetDaysInfo.push({
+        date: i,
+        dateStr: new Date(currentDate.getFullYear(), currentDate.getMonth(), i).toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" }),
+        isPaid: false
+      });
+    }
     const isToday = new Date().toDateString() === new Date(currentDate.getFullYear(), currentDate.getMonth(), i).toDateString();
     const isSundayOrSaturday = dayOfWeek === 0 || dayOfWeek === 6;
 

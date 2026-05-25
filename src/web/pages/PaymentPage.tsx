@@ -19,6 +19,7 @@ export function PaymentPage() {
   const [baseFee, setBaseFee] = useState(50000);
   const [dueDay, setDueDay] = useState(1);
   const [frequency, setFrequency] = useState<PaymentFrequency>("monthly");
+  const [systemStartDate, setSystemStartDate] = useState("");
   const [confirmResident, setConfirmResident] = useState<Resident | null>(null);
   const [activeConfirmResident, setActiveConfirmResident] = useState<Resident | null>(null);
 
@@ -47,15 +48,18 @@ export function PaymentPage() {
     let freq: PaymentFrequency = "monthly";
     let f = 50000;
     let dDay = 1;
+    let startD = "";
     if (snap.exists()) {
       const d = snap.data();
       freq = (d.frequency as PaymentFrequency) || "monthly";
       f = d.monthlyFee || 50000;
       dDay = d.dueDay ?? 1;
+      startD = d.systemStartDate || "";
     }
     setFrequency(freq);
     setBaseFee(f);
     setDueDay(dDay);
+    setSystemStartDate(startD);
     const count = freq === "daily" ? 30 : freq === "weekly" ? 12 : 12;
     const p = getPeriods(freq, count);
     setPeriods(p);
@@ -146,7 +150,7 @@ export function PaymentPage() {
     try {
       const payInfo = paidMap[confirmResident.id];
 
-      const dynamicFeeInfo = getDynamicFee(baseFee, frequency, period.key, dueDay);
+      const dynamicFeeInfo = getDynamicFee(baseFee, frequency, period.key, dueDay, systemStartDate);
 
       switch (confirmAction) {
         case "pay":
@@ -197,7 +201,7 @@ export function PaymentPage() {
   const pendingCount = Object.values(paidMap).filter(p => p.status === "pending").length;
   const unpaidCount = residents.length - confirmedCount - pendingCount;
   const selectedPeriod = periods[selectedPeriodIdx];
-  const dynamicFeeInfo = selectedPeriod ? getDynamicFee(baseFee, frequency, selectedPeriod.key, dueDay) : { fee: baseFee, count: 1, feePerPoint: baseFee };
+  const dynamicFeeInfo = selectedPeriod ? getDynamicFee(baseFee, frequency, selectedPeriod.key, dueDay, systemStartDate) : { fee: baseFee, count: 1, feePerPoint: baseFee };
   const totalIncome = Object.values(paidMap).filter(p => p.status === "confirmed").reduce((s, p) => s + p.amount, 0);
 
   // Group residents by room
