@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { collection, query, getDocs, addDoc, setDoc, doc, serverTimestamp } from "firebase/firestore";
+import { collection, query, getDocs, addDoc, setDoc, doc, serverTimestamp, where } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import { CustomSelect } from "../components/CustomSelect";
 import { useAuth } from "../contexts/AuthContext";
@@ -22,11 +22,27 @@ export function RegisterPage() {
   useEffect(() => {
     const fetchRooms = async () => {
       try {
-        const snap = await getDocs(query(collection(db, "rooms")));
-        const roomOptions = snap.docs.map((d) => ({
-          value: d.data().name,
-          label: `Kamar ${d.data().name}`,
-        }));
+        const roomsSnap = await getDocs(query(collection(db, "rooms")));
+        const residentsSnap = await getDocs(query(collection(db, "residents"), where("isActive", "==", true)));
+        
+        const counts: Record<string, number> = {};
+        residentsSnap.docs.forEach((d) => {
+          const r = d.data();
+          if (r.room) {
+            counts[r.room] = (counts[r.room] || 0) + 1;
+          }
+        });
+
+        const roomOptions = roomsSnap.docs.map((d) => {
+          const roomName = d.data().name;
+          const count = counts[roomName] || 0;
+          const occupantText = count > 0 ? `${count} Orang` : "Kosong";
+          return {
+            value: roomName,
+            label: `Kamar ${roomName} (${occupantText})`,
+          };
+        });
+
         roomOptions.sort((a, b) => a.value.localeCompare(b.value));
         setRooms(roomOptions);
       } catch (err) {
