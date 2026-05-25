@@ -14,11 +14,20 @@ interface RoomGroup { name: string; residents: Resident[]; paid: number; pending
 export function PaymentPage() {
   const [residents, setResidents] = useState<Resident[]>([]);
   const [paidMap, setPaidMap] = useState<Record<string, PayInfo>>({});
+  const [confirmedMap, setConfirmedMap] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [baseFee, setBaseFee] = useState(50000);
   const [dueDay, setDueDay] = useState(1);
   const [frequency, setFrequency] = useState<PaymentFrequency>("monthly");
   const [confirmResident, setConfirmResident] = useState<Resident | null>(null);
+  const [activeConfirmResident, setActiveConfirmResident] = useState<Resident | null>(null);
+
+  useEffect(() => {
+    if (confirmResident) {
+      setActiveConfirmResident(confirmResident);
+    }
+  }, [confirmResident]);
+
   const [confirmAction, setConfirmAction] = useState<"pay" | "cancel" | "approve" | "reject">("pay");
   const [processing, setProcessing] = useState(false);
   const [note, setNote] = useState("");
@@ -61,6 +70,7 @@ export function PaymentPage() {
     setResidents(res);
 
     const map: Record<string, PayInfo> = {};
+    const confMap: Record<string, number> = {};
 
     let snap;
     if (periodKey.match(/^\d{4}-\d{2}$/)) {
@@ -78,6 +88,10 @@ export function PaymentPage() {
       const amount = (data.amount as number) || 0;
       const status = (data.status as string) || "confirmed";
 
+      if (status === "confirmed") {
+        confMap[resId] = (confMap[resId] || 0) + amount;
+      }
+
       if (!map[resId]) {
         map[resId] = { 
           id: d.id, 
@@ -94,6 +108,7 @@ export function PaymentPage() {
       }
     });
     setPaidMap(map);
+    setConfirmedMap(confMap);
   }, []);
 
   const loadAll = useCallback(async () => {
@@ -214,6 +229,43 @@ export function PaymentPage() {
   }, [selectedRoom]);
 
   const activeRoomData = activeRoomName ? roomGroups.find(r => r.name === activeRoomName) : null;
+
+  const getResidentBillingInfo = (resId: string) => {
+    const period = periods[selectedPeriodIdx];
+    if (!period) return { totalPaid: 0, outstanding: 0, totalDue: baseFee };
+
+    const [yearStr, monthStr] = period.key.split("-");
+    const year = parseInt(yearStr || "0");
+    const month = parseInt(monthStr || "0");
+
+    const today = new Date();
+    const isCurrentMonth = today.getFullYear() === year && (today.getMonth() + 1) === month;
+
+    const feeInfo = getDynamicFee(baseFee, frequency, period.key, dueDay);
+    const feePerPoint = feeInfo.feePerPoint;
+    
+    let passedPoints = feeInfo.count; // Default: all points in the month have passed
+    if (isCurrentMonth) {
+      if (frequency === "weekly") {
+        passedPoints = 0;
+        const iter = new Date(year, month - 1, 1);
+        while (iter.getMonth() + 1 === month && iter <= today) {
+          if (iter.getDay() === dueDay) passedPoints++;
+          iter.setDate(iter.getDate() + 1);
+        }
+      } else if (frequency === "daily") {
+        passedPoints = today.getDate();
+      } else {
+        passedPoints = 1;
+      }
+    }
+
+    const totalPaid = confirmedMap[resId] || 0;
+    const totalDue = passedPoints * feePerPoint;
+    const outstanding = Math.max(0, totalDue - totalPaid);
+
+    return { totalPaid, outstanding, totalDue };
+  };
 
   return (
     <div className="space-y-6 pt-12 lg:pt-0 fade-in">
@@ -444,11 +496,11 @@ export function PaymentPage() {
       {/* Confirmation Dialog Modal */}
       <Modal 
         isOpen={!!confirmResident} 
-        onClose={() => { setConfirmResident(null); setSuccessMsg(""); }}
+        onClose={() => setConfirmResident(null)}
         title={successMsg ? "Selesai" : confirmAction === "pay" ? "Konfirmasi Kas" : confirmAction === "approve" ? "Setujui Kas" : confirmAction === "reject" ? "Tolak Kas" : "Batalkan Kas"}
         size="sm"
       >
-        {confirmResident && (
+        {activeConfirmResident && (
           <div className="space-y-5">
             {successMsg ? (
               <div className="text-center py-6 fade-in space-y-4">
@@ -466,11 +518,11 @@ export function PaymentPage() {
                 <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-3">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-sm font-bold text-indigo-600">
-                      {confirmResident.name.charAt(0).toUpperCase()}
+                      {activeConfirmResident.name.charAt(0).toUpperCase()}
                     </div>
                     <div>
-                      <p className="font-bold text-slate-800">{confirmResident.name}</p>
-                      <p className="text-xs text-slate-400 font-semibold">Kamar {confirmResident.room}</p>
+                      <p className="font-bold text-slate-800">{activeConfirmResident.name}</p>
+                      <p className="text-xs text-slate-400 font-semibold">Kamar {activeConfirmResident.room}</p>
                     </div>
                   </div>
                   <div className="border-t border-slate-200/60 pt-3 space-y-1.5 text-xs font-bold">
@@ -479,23 +531,43 @@ export function PaymentPage() {
                     {dynamicFeeInfo.count > 1 && (
                       <div className="flex justify-between"><span className="text-slate-400">TARGET TOTAL/BULAN</span><span className="text-emerald-600">{formatCurrency(dynamicFeeInfo.fee)}</span></div>
                     )}
+                    
+                    {/* Sisa Tagihan Outstanding */}
+                    <div className="flex justify-between border-t border-slate-200/40 pt-1.5 mt-1.5">
+                      <span className="text-slate-500">TOTAL SISA TAGIHAN</span>
+                      <span className="text-rose-600 font-extrabold">{formatCurrency(getResidentBillingInfo(activeConfirmResident.id).outstanding)}</span>
+                    </div>
+
+                    {/* Nominal yang diajukan atau terbayar dalam transaksi ini */}
+                    {paidMap[activeConfirmResident.id] && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">
+                          {paidMap[activeConfirmResident.id]?.status === "pending" 
+                            ? "NOMINAL YANG DIAJUKAN" 
+                            : "NOMINAL TERBAYAR"}
+                        </span>
+                        <span className="text-indigo-600 font-extrabold">
+                          {formatCurrency(paidMap[activeConfirmResident.id]?.amount || 0)}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {confirmAction === "approve" && paidMap[confirmResident.id]?.proofImage && (
+                {confirmAction === "approve" && paidMap[activeConfirmResident.id]?.proofImage && (
                   <div className="space-y-2 mt-4">
                     <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Bukti Pembayaran</label>
                     <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center p-2">
-                      <img src={paidMap[confirmResident.id]?.proofImage} alt="Bukti" className="max-h-60 object-contain rounded-lg" />
+                      <img src={paidMap[activeConfirmResident.id]?.proofImage} alt="Bukti" className="max-h-60 object-contain rounded-lg" />
                     </div>
                   </div>
                 )}
                 
-                {confirmAction === "approve" && paidMap[confirmResident.id]?.note && (
+                {confirmAction === "approve" && paidMap[activeConfirmResident.id]?.note && (
                   <div className="space-y-1 mt-2">
                     <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Catatan Penghuni</label>
                     <p className="text-sm text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-100 italic">
-                      "{paidMap[confirmResident.id]?.note}"
+                      "{paidMap[activeConfirmResident.id]?.note}"
                     </p>
                   </div>
                 )}
