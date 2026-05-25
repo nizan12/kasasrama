@@ -5,6 +5,7 @@ import { db, secondaryAuth } from "../firebase";
 import { Modal } from "../components/Modal";
 import { CustomSelect } from "../components/CustomSelect";
 import { Skeleton } from "../components/Skeleton";
+import { Pagination } from "../components/Pagination";
 
 interface Resident {
   id: string;
@@ -12,7 +13,10 @@ interface Resident {
   room: string;
   isActive: boolean;
   hasAccount?: boolean;
+  avatar?: string;
 }
+
+
 
 export function ResidentsPage() {
   const [residents, setResidents] = useState<Resident[]>([]);
@@ -25,6 +29,8 @@ export function ResidentsPage() {
   const [rooms, setRooms] = useState<{ value: string; label: string }[]>([]);
   const [saving, setSaving] = useState(false);
   const [showInactive, setShowInactive] = useState(false);
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
 
   // Account creation state
   const [showAccountModal, setShowAccountModal] = useState(false);
@@ -194,7 +200,8 @@ export function ResidentsPage() {
       r.room.toLowerCase().includes(search.toLowerCase())
   );
 
-
+  const totalPages = Math.ceil(filtered.length / perPage);
+  const paginated = filtered.slice((page - 1) * perPage, page * perPage);
 
   return (
     <div className="space-y-6 pt-12 lg:pt-0 fade-in">
@@ -267,15 +274,19 @@ export function ResidentsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filtered.map((r) => {
+                {paginated.map((r) => {
                   const hasAccount = accountMap.has(r.id);
                   return (
                     <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-xs font-bold text-indigo-650 flex-shrink-0">
-                            {r.name.charAt(0).toUpperCase()}
-                          </div>
+                          {r.avatar ? (
+                            <img src={r.avatar} alt={r.name} className="w-8 h-8 rounded-full object-cover border border-indigo-100 flex-shrink-0" />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-xs font-bold text-indigo-650 flex-shrink-0">
+                              {r.name.charAt(0).toUpperCase()}
+                            </div>
+                          )}
                           <span className="font-semibold text-slate-800">{r.name}</span>
                         </div>
                       </td>
@@ -340,6 +351,14 @@ export function ResidentsPage() {
             </table>
           </div>
         )}
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          totalItems={filtered.length}
+          itemsPerPage={perPage}
+          onItemsPerPageChange={(val) => { setPerPage(val); setPage(1); }}
+        />
       </div>
 
       {/* Add/Edit Resident Modal */}

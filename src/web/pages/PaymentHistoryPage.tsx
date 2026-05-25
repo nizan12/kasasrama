@@ -6,9 +6,11 @@ import { getFrequencyLabel, getPeriods } from "../utils/schedule";
 import { CustomSelect } from "../components/CustomSelect";
 import { Skeleton } from "../components/Skeleton";
 import { Modal } from "../components/Modal";
+import { Pagination } from "../components/Pagination";
 
 interface Payment {
   id: string;
+  residentId: string;
   residentName: string;
   periodKey: string;
   periodLabel: string;
@@ -23,6 +25,8 @@ interface Payment {
 
 const monthNames = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
 
+
+
 export function PaymentHistoryPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,14 +34,18 @@ export function PaymentHistoryPage() {
   const [frequency, setFrequency] = useState<PaymentFrequency>("monthly");
   const [selectedPeriod, setSelectedPeriod] = useState("all");
   const [periods, setPeriods] = useState<{ key: string; label: string }[]>([]);
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
   const [viewingImage, setViewingImage] = useState<string | null>(null);
   const imageRef = useRef<string>("");
-  if (viewingImage) imageRef.current = viewingImage; // preserve during close animation
+  if (viewingImage) imageRef.current = viewingImage;
 
   const closeImageViewer = () => setViewingImage(null);
 
   const formatCurrency = (n: number) =>
     new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
+
+  const [residentAvatars, setResidentAvatars] = useState<Record<string, string>>({});
 
   const loadPayments = useCallback(async () => {
     setLoading(true);
@@ -53,6 +61,17 @@ export function PaymentHistoryPage() {
       const p = getPeriods(freq, count);
       setPeriods(p);
 
+      // Fetch all residents to map avatars
+      const residentsSnap = await getDocs(collection(db, "residents"));
+      const avatarMap: Record<string, string> = {};
+      residentsSnap.docs.forEach((d) => {
+        const rData = d.data();
+        if (rData.avatar) {
+          avatarMap[d.id] = rData.avatar;
+        }
+      });
+      setResidentAvatars(avatarMap);
+
       let q;
       if (selectedPeriod !== "all") {
         q = query(collection(db, "payments"), where("periodKey", "==", selectedPeriod));
@@ -67,6 +86,7 @@ export function PaymentHistoryPage() {
           ...raw,
           periodLabel: raw.periodLabel || (raw.month && raw.year ? `${monthNames[(raw.month as number) - 1]} ${raw.year}` : "Unknown"),
           periodKey: raw.periodKey || (raw.month && raw.year ? `${raw.year}-${String(raw.month).padStart(2, "0")}` : ""),
+          residentId: raw.residentId || "",
         } as Payment;
       });
       data.sort((a, b) => (b.paidAt?.seconds || 0) - (a.paidAt?.seconds || 0));
@@ -81,6 +101,12 @@ export function PaymentHistoryPage() {
   );
 
   const totalAmount = filtered.reduce((s, p) => s + p.amount, 0);
+  const totalPages = Math.ceil(filtered.length / perPage);
+  const paginated = filtered.slice((page - 1) * perPage, page * perPage);
+
+  // Reset to page 1 when filters change
+  const handleSearch = (v: string) => { setSearch(v); setPage(1); };
+  const handlePeriod = (v: string) => { setSelectedPeriod(v); setPage(1); };
 
   return (
     <div className="space-y-6 pt-12 lg:pt-0 fade-in">
@@ -102,7 +128,7 @@ export function PaymentHistoryPage() {
             type="text" 
             placeholder="Cari nama penghuni..." 
             value={search} 
-            onChange={(e) => setSearch(e.target.value)} 
+            onChange={(e) => handleSearch(e.target.value)} 
             className="input-premium pl-12 text-sm text-slate-800" 
           />
         </div>
@@ -113,7 +139,7 @@ export function PaymentHistoryPage() {
               ...periods.map(p => ({ value: p.key, label: p.label }))
             ]}
             value={selectedPeriod} 
-            onChange={setSelectedPeriod} 
+            onChange={handlePeriod} 
             placeholder="Pilih Periode"
           />
         </div>
@@ -154,13 +180,17 @@ export function PaymentHistoryPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filtered.map((p) => (
+                {paginated.map((p) => (
                   <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-xs font-bold text-indigo-650 flex-shrink-0">
-                          {p.residentName.charAt(0).toUpperCase()}
-                        </div>
+                        {residentAvatars[p.residentId] ? (
+                          <img src={residentAvatars[p.residentId]} alt={p.residentName} className="w-8 h-8 rounded-full object-cover border border-indigo-100 flex-shrink-0" />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-xs font-bold text-indigo-650 flex-shrink-0">
+                            {p.residentName.charAt(0).toUpperCase()}
+                          </div>
+                        )}
                         <span className="font-semibold text-slate-800">{p.residentName}</span>
                       </div>
                     </td>
@@ -186,6 +216,14 @@ export function PaymentHistoryPage() {
             </table>
           </div>
         )}
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          totalItems={filtered.length}
+          itemsPerPage={perPage}
+          onItemsPerPageChange={(val) => { setPerPage(val); setPage(1); }}
+        />
       </div>
 
       {/* Image Viewer Modal — standard Modal component */}

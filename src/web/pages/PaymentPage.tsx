@@ -1,13 +1,15 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { collection, query, where, getDocs, addDoc, deleteDoc, updateDoc, doc, getDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
 import { Modal } from "../components/Modal";
 import { Skeleton } from "../components/Skeleton";
+import { Pagination } from "../components/Pagination";
 import type { PaymentFrequency } from "../utils/schedule";
 import { getCurrentPeriodKey, getPeriods, getFrequencyLabel, getDynamicFee } from "../utils/schedule";
 
-interface Resident { id: string; name: string; room: string; }
+interface Resident { id: string; name: string; room: string; avatar?: string; }
 interface PayInfo { id: string; amount: number; status?: string; proofImage?: string; note?: string; }
+interface RoomGroup { name: string; residents: Resident[]; paid: number; pending: number; unpaid: number; total: number; pct: number; }
 
 export function PaymentPage() {
   const [residents, setResidents] = useState<Resident[]>([]);
@@ -21,6 +23,9 @@ export function PaymentPage() {
   const [processing, setProcessing] = useState(false);
   const [note, setNote] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
+  const [roomPage, setRoomPage] = useState(1);
+  const [roomPerPage, setRoomPerPage] = useState(10);
 
   const [periods, setPeriods] = useState<{ key: string; label: string; shortLabel: string }[]>([]);
   const [selectedPeriodIdx, setSelectedPeriodIdx] = useState(0);
@@ -180,7 +185,35 @@ export function PaymentPage() {
   const dynamicFeeInfo = selectedPeriod ? getDynamicFee(baseFee, frequency, selectedPeriod.key, dueDay) : { fee: baseFee, count: 1, feePerPoint: baseFee };
   const totalIncome = Object.values(paidMap).filter(p => p.status === "confirmed").reduce((s, p) => s + p.amount, 0);
 
+  // Group residents by room
+  const roomGroups = useMemo<RoomGroup[]>(() => {
+    const map: Record<string, Resident[]> = {};
+    residents.forEach(r => {
+      const room = r.room || "Tanpa Kamar";
+      if (!map[room]) map[room] = [];
+      map[room]!.push(r);
+    });
+    return Object.entries(map).map(([name, res]) => {
+      const paid = res.filter(r => paidMap[r.id]?.status === "confirmed").length;
+      const pending = res.filter(r => paidMap[r.id]?.status === "pending").length;
+      const unpaid = res.length - paid - pending;
+      const pct = res.length > 0 ? Math.round((paid / res.length) * 100) : 0;
+      return { name, residents: res, paid, pending, unpaid, total: res.length, pct };
+    }).sort((a, b) => a.name.localeCompare(b.name));
+  }, [residents, paidMap]);
 
+  const roomTotalPages = Math.ceil(roomGroups.length / roomPerPage);
+  const paginatedRooms = roomGroups.slice((roomPage - 1) * roomPerPage, roomPage * roomPerPage);
+
+  const [activeRoomName, setActiveRoomName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (selectedRoom) {
+      setActiveRoomName(selectedRoom);
+    }
+  }, [selectedRoom]);
+
+  const activeRoomData = activeRoomName ? roomGroups.find(r => r.name === activeRoomName) : null;
 
   return (
     <div className="space-y-6 pt-12 lg:pt-0 fade-in">
@@ -278,100 +311,135 @@ export function PaymentPage() {
         </div>
       )}
 
-      {/* Payment Grid */}
+      {/* Room Table */}
       {loading ? (
-        <Skeleton type="grid" count={6} />
-      ) : residents.length === 0 ? (
+        <Skeleton type="table" count={5} />
+      ) : roomGroups.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-3xl border border-slate-100 shadow-sm">
           <span className="inline-block p-4 rounded-full bg-slate-50 text-slate-400 mb-2">
-            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
           </span>
           <p className="text-slate-400 text-sm font-bold mt-3">Belum ada data penghuni</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {residents.map((r) => {
-          const payInfo = paidMap[r.id];
-          const status = payInfo?.status || null;
-
-          return (
-            <div 
-              key={r.id}
-              onClick={() => {
-                if (status === "pending") return;
-                if (status === "confirmed") openModal(r, "cancel");
-                else openModal(r, "pay");
-              }}
-              className={`p-5 rounded-3xl border transition-all duration-300 ${
-                status === "confirmed" 
-                  ? "bg-emerald-50/30 border-emerald-100 hover:bg-emerald-50/60 cursor-pointer hover:scale-[1.01]"
-                  : status === "pending" 
-                    ? "bg-amber-50/30 border-amber-100"
-                    : "bg-white border-slate-200/60 hover:bg-slate-50/80 cursor-pointer hover:scale-[1.01] shadow-sm shadow-slate-100"
-              }`}
-            >
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3.5 min-w-0">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold border ${
-                    status === "confirmed" 
-                      ? "bg-emerald-100 text-emerald-600 border-emerald-200"
-                      : status === "pending" 
-                        ? "bg-amber-100 text-amber-600 border-amber-200"
-                        : "bg-slate-100 text-slate-500 border-slate-200"
-                  }`}>
-                    {r.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-bold text-slate-800 truncate">{r.name}</p>
-                    <p className="text-xs text-slate-400 font-semibold">Kamar {r.room}</p>
-                  </div>
-                </div>
-
-                <div className="text-right flex-shrink-0">
-                  {status === "confirmed" ? (
-                    <div className="space-y-1">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-600">Lunas</span>
-                      <p className="text-xs text-emerald-600 font-bold">{formatCurrency(payInfo!.amount)}</p>
-                    </div>
-                  ) : status === "pending" ? (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-600">Verifikasi</span>
-                  ) : (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-500 border border-rose-100">Belum</span>
-                  )}
-                </div>
-              </div>
-
-              {/* Action buttons for verification */}
-              {status === "pending" && (
-                <div className="flex gap-2.5 mt-4 pt-1">
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); openModal(r, "approve"); }}
-                    className="w-full flex justify-center items-center gap-1 py-2 px-3 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors text-xs font-bold border border-emerald-100"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg> Setujui
-                  </button>
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); openModal(r, "reject"); }}
-                    className="w-full flex justify-center items-center gap-1 py-2 px-3 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors text-xs font-bold border border-rose-100"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg> Tolak
-                  </button>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      )}
-
-      {residents.length === 0 && (
-        <div className="text-center py-16">
-          <span className="inline-block p-4 rounded-full bg-slate-50 text-slate-400 mb-2">
-            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-          </span>
-          <p className="text-slate-400 text-sm font-bold mt-3">Tidak ada penghuni yang sesuai pencarian</p>
+        <div className="premium-card overflow-hidden bg-white border border-slate-100 shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50/50">
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Kamar</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider text-center">Penghuni</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider text-center">Lunas</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider text-center">Belum</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider text-center">Verifikasi</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Progres</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider text-right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {paginatedRooms.map((room) => (
+                  <tr key={room.name} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                        </div>
+                        <span className="font-bold text-slate-800">{room.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-center"><span className="text-sm font-bold text-slate-600">{room.total}</span></td>
+                    <td className="px-6 py-4 text-center"><span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100">{room.paid}</span></td>
+                    <td className="px-6 py-4 text-center"><span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold ${room.unpaid > 0 ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-slate-50 text-slate-400 border border-slate-200'}`}>{room.unpaid}</span></td>
+                    <td className="px-6 py-4 text-center">{room.pending > 0 ? <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-600 border border-amber-100">{room.pending}</span> : <span className="text-slate-300 text-xs">—</span>}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2.5 min-w-[120px]">
+                        <div className="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden">
+                          <div className="h-full rounded-full transition-all duration-500" style={{ width: `${room.pct}%`, background: room.pct === 100 ? '#10b981' : room.pct >= 50 ? '#f59e0b' : '#ef4444' }} />
+                        </div>
+                        <span className="text-xs font-extrabold whitespace-nowrap" style={{ color: room.pct === 100 ? '#10b981' : room.pct >= 50 ? '#f59e0b' : '#ef4444' }}>{room.pct}%</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <button onClick={() => setSelectedRoom(room.name)} className="px-3.5 py-2 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors text-xs font-bold border border-indigo-100 whitespace-nowrap">
+                        Lihat Detail
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pagination currentPage={roomPage} totalPages={roomTotalPages} onPageChange={setRoomPage} totalItems={roomGroups.length} itemsPerPage={roomPerPage} onItemsPerPageChange={(v) => { setRoomPerPage(v); setRoomPage(1); }} />
         </div>
       )}
+
+      {/* Room Detail Modal */}
+      <Modal isOpen={!!selectedRoom} onClose={() => setSelectedRoom(null)} title={`Detail Kamar ${selectedRoom || activeRoomName || ''}`} size="lg">
+        {activeRoomData && (
+          <div className="space-y-4">
+            {/* Room summary */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-slate-50 text-slate-600 border border-slate-200">{activeRoomData.total} Penghuni</span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-100">Lunas: {activeRoomData.paid}</span>
+              {activeRoomData.pending > 0 && <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-amber-50 text-amber-600 border border-amber-100">Verifikasi: {activeRoomData.pending}</span>}
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-rose-50 text-rose-600 border border-rose-100">Belum: {activeRoomData.unpaid}</span>
+            </div>
+            {/* Progress */}
+            <div className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-100">
+              <div className="flex-1 h-2.5 rounded-full bg-slate-200 overflow-hidden">
+                <div className="h-full rounded-full transition-all duration-500" style={{ width: `${activeRoomData.pct}%`, background: activeRoomData.pct === 100 ? '#10b981' : activeRoomData.pct >= 50 ? '#f59e0b' : '#ef4444' }} />
+              </div>
+              <span className="text-sm font-extrabold" style={{ color: activeRoomData.pct === 100 ? '#10b981' : activeRoomData.pct >= 50 ? '#f59e0b' : '#ef4444' }}>{activeRoomData.pct}%</span>
+            </div>
+            {/* Residents list */}
+            <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+              {activeRoomData.residents.map(r => {
+                const payInfo = paidMap[r.id];
+                const status = payInfo?.status || null;
+                return (
+                  <div key={r.id} className={`p-4 rounded-2xl border transition-all ${status === 'confirmed' ? 'bg-emerald-50/40 border-emerald-100' : status === 'pending' ? 'bg-amber-50/40 border-amber-100' : 'bg-white border-slate-200'}`}>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        {r.avatar ? (
+                          <img src={r.avatar} alt={r.name} className="w-9 h-9 rounded-full object-cover border border-slate-200 flex-shrink-0" />
+                        ) : (
+                          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold border flex-shrink-0 ${status === 'confirmed' ? 'bg-emerald-100 text-emerald-600 border-emerald-200' : status === 'pending' ? 'bg-amber-100 text-amber-600 border-amber-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>{r.name.charAt(0).toUpperCase()}</div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="font-bold text-slate-800 text-sm truncate">{r.name}</p>
+                          {status === 'confirmed' && <p className="text-[11px] text-emerald-600 font-bold">{formatCurrency(payInfo!.amount)}</p>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {status === 'confirmed' ? (
+                          <>
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-600">Lunas</span>
+                            <button onClick={() => { setSelectedRoom(null); setTimeout(() => openModal(r, 'cancel'), 350); }} className="p-1.5 rounded-lg bg-slate-50 border border-slate-200 hover:bg-rose-50 hover:text-rose-600 text-slate-400 transition-colors" title="Batalkan">
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                          </>
+                        ) : status === 'pending' ? (
+                          <>
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-600">Verifikasi</span>
+                            <button onClick={() => { setSelectedRoom(null); setTimeout(() => openModal(r, 'approve'), 350); }} className="p-1.5 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-600 hover:bg-emerald-100 transition-colors" title="Setujui">
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                            </button>
+                            <button onClick={() => { setSelectedRoom(null); setTimeout(() => openModal(r, 'reject'), 350); }} className="p-1.5 rounded-lg bg-rose-50 border border-rose-100 text-rose-600 hover:bg-rose-100 transition-colors" title="Tolak">
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                          </>
+                        ) : (
+                          <button onClick={() => { setSelectedRoom(null); setTimeout(() => openModal(r, 'pay'), 350); }} className="px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors text-xs font-bold border border-indigo-100">Catat Bayar</button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* Confirmation Dialog Modal */}
       <Modal 

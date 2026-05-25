@@ -4,6 +4,7 @@ import { db } from "../firebase";
 import { useAuth } from "../contexts/AuthContext";
 import { Skeleton } from "../components/Skeleton";
 import { Modal } from "../components/Modal";
+import { Pagination } from "../components/Pagination";
 
 interface Payment {
   id: string;
@@ -16,12 +17,16 @@ interface Payment {
   proofImage?: string;
 }
 
+
+
 export function ResidentHistoryPage() {
   const { profile } = useAuth();
   const [history, setHistory] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "confirmed" | "pending">("all");
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
 
   const [viewingImage, setViewingImage] = useState<string | null>(null);
   const imageRef = useRef<string>("");
@@ -64,6 +69,12 @@ export function ResidentHistoryPage() {
     }
     return list;
   }, [history, statusFilter, search]);
+
+  // Reset to page 1 when filter/search changes
+  useMemo(() => setPage(1), [statusFilter, search]);
+
+  const totalPages = Math.ceil(filtered.length / perPage);
+  const paginated = filtered.slice((page - 1) * perPage, page * perPage);
 
   if (loading) return <Skeleton type="residentHistory" />;
 
@@ -167,7 +178,7 @@ export function ResidentHistoryPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
-                {filtered.map((h) => (
+                {paginated.map((h) => (
                   <tr key={h.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="font-bold text-slate-800 text-sm">{h.periodLabel}</span>
@@ -220,6 +231,14 @@ export function ResidentHistoryPage() {
             </table>
           </div>
         )}
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          totalItems={filtered.length}
+          itemsPerPage={perPage}
+          onItemsPerPageChange={(val) => { setPerPage(val); setPage(1); }}
+        />
       </div>
 
       <Modal isOpen={!!viewingImage} onClose={closeImageViewer} title="Bukti Pembayaran" size="lg">

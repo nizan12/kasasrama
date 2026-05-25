@@ -3,6 +3,7 @@ import { collection, query, orderBy, getDocs, addDoc, serverTimestamp, deleteDoc
 import { db } from "../firebase";
 import { Modal } from "../components/Modal";
 import { Skeleton } from "../components/Skeleton";
+import { Pagination } from "../components/Pagination";
 
 interface Expense {
   id: string;
@@ -13,12 +14,16 @@ interface Expense {
   date: { seconds: number } | null;
 }
 
+
+
 export function ExpensesPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [totalIncome, setTotalIncome] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
 
   // Form State
   const [title, setTitle] = useState("");
@@ -147,6 +152,9 @@ export function ExpensesPage() {
     }
   };
 
+  const totalPages = Math.ceil(expenses.length / perPage);
+  const paginated = expenses.slice((page - 1) * perPage, page * perPage);
+
   return (
     <div className="space-y-6 pt-12 lg:pt-0 fade-in">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -194,7 +202,7 @@ export function ExpensesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {expenses.map((e) => (
+                {paginated.map((e) => (
                   <tr key={e.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-4 text-slate-400 text-xs font-semibold">
                       {e.date ? new Date(e.date.seconds * 1000).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "Baru saja"}
@@ -213,6 +221,14 @@ export function ExpensesPage() {
             </table>
           </div>
         )}
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          totalItems={expenses.length}
+          itemsPerPage={perPage}
+          onItemsPerPageChange={(val) => { setPerPage(val); setPage(1); }}
+        />
       </div>
 
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Catat Pengeluaran" size="lg">
