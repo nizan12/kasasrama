@@ -4,6 +4,7 @@ import { db } from "../firebase";
 import { Modal } from "../components/Modal";
 import { Skeleton } from "../components/Skeleton";
 import { Pagination } from "../components/Pagination";
+import { useToast } from "../components/Toast";
 import type { PaymentFrequency } from "../utils/schedule";
 import { getCurrentPeriodKey, getPeriods, getFrequencyLabel, getDynamicFee } from "../utils/schedule";
 
@@ -12,6 +13,7 @@ interface PayInfo { id: string; amount: number; status?: string; proofImage?: st
 interface RoomGroup { name: string; residents: Resident[]; paid: number; pending: number; unpaid: number; total: number; pct: number; }
 
 export function PaymentPage() {
+  const toast = useToast();
   const [residents, setResidents] = useState<Resident[]>([]);
   const [paidMap, setPaidMap] = useState<Record<string, PayInfo>>({});
   const [confirmedMap, setConfirmedMap] = useState<Record<string, number>>({});
@@ -152,6 +154,7 @@ export function PaymentPage() {
 
       const dynamicFeeInfo = getDynamicFee(baseFee, frequency, period.key, dueDay, systemStartDate);
 
+      let msg = "";
       switch (confirmAction) {
         case "pay":
           await addDoc(collection(db, "payments"), {
@@ -167,34 +170,47 @@ export function PaymentPage() {
             month: new Date().getMonth() + 1,
             year: new Date().getFullYear(),
           });
-          setSuccessMsg(`Pembayaran ${confirmResident.name} berhasil dicatat`);
+          msg = `Pembayaran ${confirmResident.name} berhasil dicatat`;
+          setSuccessMsg(msg);
+          toast.success(msg);
           break;
 
         case "approve":
           if (payInfo) {
             await updateDoc(doc(db, "payments", payInfo.id), { status: "confirmed" });
-            setSuccessMsg(`Pembayaran ${confirmResident.name} disetujui`);
+            msg = `Pembayaran ${confirmResident.name} disetujui`;
+            setSuccessMsg(msg);
+            toast.success(msg);
           }
           break;
 
         case "reject":
           if (payInfo) {
             await deleteDoc(doc(db, "payments", payInfo.id));
-            setSuccessMsg(`Pembayaran ${confirmResident.name} ditolak`);
+            msg = `Pembayaran ${confirmResident.name} ditolak`;
+            setSuccessMsg(msg);
+            toast.info(msg);
           }
           break;
 
         case "cancel":
           if (payInfo) {
             await deleteDoc(doc(db, "payments", payInfo.id));
-            setSuccessMsg(`Pembayaran ${confirmResident.name} dibatalkan`);
+            msg = `Pembayaran ${confirmResident.name} dibatalkan`;
+            setSuccessMsg(msg);
+            toast.info(msg);
           }
           break;
       }
 
       await loadPayments(period.key);
       setTimeout(() => { setConfirmResident(null); setSuccessMsg(""); }, 1500);
-    } catch (err) { console.error(err); } finally { setProcessing(false); }
+    } catch (err) { 
+      console.error(err); 
+      toast.error("Gagal melakukan aksi pembayaran");
+    } finally { 
+      setProcessing(false); 
+    }
   };
 
   const confirmedCount = Object.values(paidMap).filter(p => p.status === "confirmed").length;

@@ -9,6 +9,7 @@ import { convertQRIS } from "../../core";
 import { Modal } from "../components/Modal";
 import { CustomSelect } from "../components/CustomSelect";
 import { Skeleton } from "../components/Skeleton";
+import { useToast } from "../components/Toast";
 
 interface Payment {
   id: string;
@@ -23,6 +24,7 @@ interface Payment {
 }
 
 export function ResidentHomePage() {
+  const toast = useToast();
   const { profile } = useAuth();
   const [residentName, setResidentName] = useState("");
   const [room, setRoom] = useState("");

@@ -16,6 +16,7 @@ import { RoomsPage } from "./pages/RoomsPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { ExpensesPage } from "./pages/ExpensesPage";
 import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
+import { ToastProvider } from "./components/Toast";
 import type { ReactNode } from "react";
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -110,32 +111,34 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
-          <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
-          <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
-          <Route path="/lupa-password" element={<PublicRoute><ForgotPasswordPage /></PublicRoute>} />
+        <ToastProvider>
+          <Routes>
+            <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
+            <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
+            <Route path="/lupa-password" element={<PublicRoute><ForgotPasswordPage /></PublicRoute>} />
 
-          {/* Admin routes */}
-          <Route path="/" element={<ProtectedRoute><AdminRoute><Layout /></AdminRoute></ProtectedRoute>}>
-            <Route index element={<DashboardPage />} />
-            <Route path="penghuni" element={<ResidentsPage />} />
-            <Route path="pembayaran" element={<PaymentPage />} />
-            <Route path="riwayat" element={<PaymentHistoryPage />} />
-            <Route path="pengeluaran" element={<ExpensesPage />} />
-            <Route path="kalender" element={<AdminCalendarPage />} />
-            <Route path="kamar" element={<RoomsPage />} />
-            <Route path="pengaturan" element={<SettingsPage />} />
-          </Route>
+            {/* Admin routes */}
+            <Route path="/" element={<ProtectedRoute><AdminRoute><Layout /></AdminRoute></ProtectedRoute>}>
+              <Route index element={<DashboardPage />} />
+              <Route path="penghuni" element={<ResidentsPage />} />
+              <Route path="pembayaran" element={<PaymentPage />} />
+              <Route path="riwayat" element={<PaymentHistoryPage />} />
+              <Route path="pengeluaran" element={<ExpensesPage />} />
+              <Route path="kalender" element={<AdminCalendarPage />} />
+              <Route path="kamar" element={<RoomsPage />} />
+              <Route path="pengaturan" element={<SettingsPage />} />
+            </Route>
 
-          {/* Resident routes */}
-          <Route path="/beranda" element={<ProtectedRoute><ResidentRoute><Layout /></ResidentRoute></ProtectedRoute>}>
-            <Route index element={<ResidentHomePage />} />
-            <Route path="riwayat" element={<ResidentHistoryPage />} />
-            <Route path="kalender" element={<ResidentCalendarPage />} />
-          </Route>
+            {/* Resident routes */}
+            <Route path="/beranda" element={<ProtectedRoute><ResidentRoute><Layout /></ResidentRoute></ProtectedRoute>}>
+              <Route index element={<ResidentHomePage />} />
+              <Route path="riwayat" element={<ResidentHistoryPage />} />
+              <Route path="kalender" element={<ResidentCalendarPage />} />
+            </Route>
 
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        </Routes>
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          </Routes>
+        </ToastProvider>
       </AuthProvider>
     </BrowserRouter>
   );

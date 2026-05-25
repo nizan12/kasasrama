@@ -4,6 +4,8 @@ import { db } from "../firebase";
 import { Modal } from "../components/Modal";
 import { Skeleton } from "../components/Skeleton";
 import { Pagination } from "../components/Pagination";
+import { ConfirmModal } from "../components/ConfirmModal";
+import { useToast } from "../components/Toast";
 
 interface Room {
   id: string;
@@ -12,6 +14,7 @@ interface Room {
 }
 
 export function RoomsPage() {
+  const toast = useToast();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -22,6 +25,9 @@ export function RoomsPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [formName, setFormName] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const loadRooms = useCallback(async () => {
     try {
@@ -67,13 +73,23 @@ export function RoomsPage() {
     setShowModal(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm("Apakah Anda yakin ingin menghapus kamar ini?")) return;
+  const handleDelete = (id: string) => {
+    setDeleteId(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteId) return;
+    setDeleting(true);
     try {
-      await deleteDoc(doc(db, "rooms", id));
+      await deleteDoc(doc(db, "rooms", deleteId));
+      setDeleteId(null);
       await loadRooms();
+      toast.success("Kamar berhasil dihapus");
     } catch (err) {
       console.error(err);
+      toast.error("Gagal menghapus kamar");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -86,16 +102,19 @@ export function RoomsPage() {
         await updateDoc(doc(db, "rooms", editId), {
           name: formName.trim(),
         });
+        toast.success("Kamar berhasil diperbarui");
       } else {
         await addDoc(collection(db, "rooms"), {
           name: formName.trim(),
           createdAt: serverTimestamp(),
         });
+        toast.success("Kamar baru berhasil ditambahkan");
       }
       setShowModal(false);
       await loadRooms();
     } catch (err) {
       console.error(err);
+      toast.error("Gagal menyimpan data kamar");
     } finally {
       setSaving(false);
     }
@@ -233,6 +252,17 @@ export function RoomsPage() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmModal
+        isOpen={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        onConfirm={confirmDelete}
+        title="Hapus Kamar"
+        message="Apakah Anda yakin ingin menghapus kamar ini? Semua data kamar akan dihapus secara permanen dari sistem."
+        confirmText="Hapus"
+        type="danger"
+        isLoading={deleting}
+      />
     </div>
   );
 }

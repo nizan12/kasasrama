@@ -35,27 +35,27 @@
 
   /* Premium Buttons */
   .btn-premium-primary {
-    @apply px-6 py-3.5 rounded-2xl font-bold text-white transition-all duration-300 ease-out 
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl font-bold text-white transition-all duration-300 ease-out 
            bg-gradient-to-r from-indigo-600 to-violet-600 
            hover:opacity-95 hover:shadow-[0_8px_25px_rgba(99,102,241,0.25)] hover:scale-[1.01]
            active:scale-100 disabled:opacity-50 disabled:pointer-events-none;
   }
 
   .btn-premium-secondary {
-    @apply px-6 py-3.5 rounded-2xl font-bold text-slate-600 bg-slate-50 border border-slate-200/80 
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl font-bold text-slate-600 bg-slate-50 border border-slate-200/80 
            transition-all duration-300 ease-out 
            hover:bg-slate-100 hover:text-slate-900 hover:border-slate-300 hover:scale-[1.01];
   }
 
   .btn-premium-danger {
-    @apply px-6 py-3.5 rounded-2xl font-bold text-white transition-all duration-300 ease-out 
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl font-bold text-white transition-all duration-300 ease-out 
            bg-gradient-to-r from-rose-500 to-red-500 
            hover:opacity-95 hover:shadow-[0_8px_25px_rgba(244,63,94,0.2)] hover:scale-[1.01]
            active:scale-100;
   }
 
   .btn-premium-success {
-    @apply px-6 py-3.5 rounded-2xl font-bold text-white transition-all duration-300 ease-out 
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl font-bold text-white transition-all duration-300 ease-out 
            bg-gradient-to-r from-emerald-500 to-teal-500 
            hover:opacity-95 hover:shadow-[0_8px_25px_rgba(16,185,129,0.2)] hover:scale-[1.01]
            active:scale-100;
@@ -66,4 +66,32 @@
     @apply w-full px-4 py-3.5 rounded-2xl bg-white border border-slate-200 text-slate-800 placeholder-slate-400 
            transition-all duration-300 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5;
   }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateY(1rem) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toastProgress {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-toast-progress {
+  animation: toastProgress 3.5s linear forwards;
 }

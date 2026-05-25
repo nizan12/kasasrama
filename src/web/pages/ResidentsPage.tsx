@@ -6,6 +6,8 @@ import { Modal } from "../components/Modal";
 import { CustomSelect } from "../components/CustomSelect";
 import { Skeleton } from "../components/Skeleton";
 import { Pagination } from "../components/Pagination";
+import { ConfirmModal } from "../components/ConfirmModal";
+import { useToast } from "../components/Toast";
 
 interface Resident {
   id: string;
@@ -19,6 +21,7 @@ interface Resident {
 
 
 export function ResidentsPage() {
+  const toast = useToast();
   const [residents, setResidents] = useState<Resident[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -40,6 +43,16 @@ export function ResidentsPage() {
   const [creatingAccount, setCreatingAccount] = useState(false);
   const [accountError, setAccountError] = useState("");
   const [accountSuccess, setAccountSuccess] = useState("");
+
+  const [confirmResident, setConfirmResident] = useState<Resident | null>(null);
+  const [activeConfirmResident, setActiveConfirmResident] = useState<Resident | null>(null);
+  const [togglingActive, setTogglingActive] = useState(false);
+
+  useEffect(() => {
+    if (confirmResident) {
+      setActiveConfirmResident(confirmResident);
+    }
+  }, [confirmResident]);
 
   // Track which residents have accounts
   const [accountMap, setAccountMap] = useState<Set<string>>(new Set());
@@ -114,6 +127,7 @@ export function ResidentsPage() {
           name: formName.trim(),
           room: formRoom.trim(),
         });
+        toast.success("Data penghuni berhasil diperbarui");
       } else {
         await addDoc(collection(db, "residents"), {
           name: formName.trim(),
@@ -121,22 +135,36 @@ export function ResidentsPage() {
           isActive: true,
           createdAt: serverTimestamp(),
         });
+        toast.success("Penghuni baru berhasil ditambahkan");
       }
       setShowModal(false);
       await loadResidents();
     } catch (err) {
       console.error(err);
+      toast.error("Gagal menyimpan data penghuni");
     } finally {
       setSaving(false);
     }
   };
 
-  const toggleActive = async (r: Resident) => {
+  const toggleActive = (r: Resident) => {
+    setConfirmResident(r);
+  };
+
+  const confirmToggleActive = async () => {
+    if (!confirmResident) return;
+    setTogglingActive(true);
     try {
-      await updateDoc(doc(db, "residents", r.id), { isActive: !r.isActive });
+      await updateDoc(doc(db, "residents", confirmResident.id), { isActive: !confirmResident.isActive });
+      const actionText = confirmResident.isActive ? "dinonaktifkan" : "diaktifkan";
+      setConfirmResident(null);
       await loadResidents();
+      toast.success(`Akun penghuni berhasil ${actionText}`);
     } catch (err) {
       console.error(err);
+      toast.error("Gagal mengubah status aktif penghuni");
+    } finally {
+      setTogglingActive(false);
     }
   };
 
@@ -154,6 +182,7 @@ export function ResidentsPage() {
     if (!accountResident || !accountEmail.trim() || !accountPassword.trim()) return;
     if (accountPassword.length < 6) {
       setAccountError("Password minimal 6 karakter");
+      toast.warning("Password minimal 6 karakter");
       return;
     }
     setCreatingAccount(true);
@@ -176,19 +205,21 @@ export function ResidentsPage() {
       await signOut(secondaryAuth);
 
       setAccountSuccess(`Akun berhasil dibuat untuk ${accountResident.name}`);
+      toast.success(`Akun login berhasil dibuat untuk ${accountResident.name}`);
       await loadResidents();
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code || "";
+      let errMsg = "Gagal membuat akun. Coba lagi.";
       if (code === "auth/email-already-in-use") {
-        setAccountError("Email sudah digunakan");
+        errMsg = "Email sudah digunakan";
       } else if (code === "auth/invalid-email") {
-        setAccountError("Format email tidak valid");
+        errMsg = "Format email tidak valid";
       } else if (code === "auth/weak-password") {
-        setAccountError("Password terlalu lemah (minimal 6 karakter)");
-      } else {
-        setAccountError("Gagal membuat akun. Coba lagi.");
-        console.error(err);
+        errMsg = "Password terlalu lemah (minimal 6 karakter)";
       }
+      setAccountError(errMsg);
+      toast.error(errMsg);
+      console.error(err);
     } finally {
       setCreatingAccount(false);
     }
@@ -448,6 +479,21 @@ export function ResidentsPage() {
           </form>
         )}
       </Modal>
+
+      <ConfirmModal
+        isOpen={!!confirmResident}
+        onClose={() => setConfirmResident(null)}
+        onConfirm={confirmToggleActive}
+        title={activeConfirmResident?.isActive ? "Nonaktifkan Penghuni" : "Aktifkan Penghuni"}
+        message={
+          activeConfirmResident?.isActive
+            ? `Apakah Anda yakin ingin menonaktifkan akun penghuni ${activeConfirmResident.name}? Status tagihan berjalan tidak akan aktif.`
+            : `Apakah Anda yakin ingin mengaktifkan kembali akun penghuni ${activeConfirmResident?.name}?`
+        }
+        confirmText={activeConfirmResident?.isActive ? "Nonaktifkan" : "Aktifkan"}
+        type={activeConfirmResident?.isActive ? "danger" : "info"}
+        isLoading={togglingActive}
+      />
     </div>
   );
 }

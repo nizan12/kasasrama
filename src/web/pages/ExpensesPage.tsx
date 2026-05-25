@@ -4,6 +4,8 @@ import { db } from "../firebase";
 import { Modal } from "../components/Modal";
 import { Skeleton } from "../components/Skeleton";
 import { Pagination } from "../components/Pagination";
+import { ConfirmModal } from "../components/ConfirmModal";
+import { useToast } from "../components/Toast";
 
 interface Expense {
   id: string;
@@ -17,6 +19,7 @@ interface Expense {
 
 
 export function ExpensesPage() {
+  const toast = useToast();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [totalIncome, setTotalIncome] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -24,6 +27,9 @@ export function ExpensesPage() {
   const [submitting, setSubmitting] = useState(false);
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
+
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Form State
   const [title, setTitle] = useState("");
@@ -101,19 +107,19 @@ export function ExpensesPage() {
   const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !proofImage || itemList.length === 0) {
-      alert("Mohon lengkapi semua data, termasuk bukti pengeluaran.");
+      toast.warning("Mohon lengkapi semua data, termasuk bukti pengeluaran.");
       return;
     }
     
     for (const item of itemList) {
       if (!item.name || item.qty < 1 || item.price < 0) {
-        alert("Mohon lengkapi rincian barang dengan benar.");
+        toast.warning("Mohon lengkapi rincian barang dengan benar.");
         return;
       }
     }
 
     if (computedAmount > currentBalance) {
-      alert(`Saldo tidak mencukupi! Sisa saldo saat ini: ${formatCurrency(currentBalance)}`);
+      toast.error(`Saldo tidak mencukupi! Sisa saldo saat ini: ${formatCurrency(currentBalance)}`);
       return;
     }
 
@@ -133,22 +139,32 @@ export function ExpensesPage() {
       setItemList([{ name: "", qty: 1, price: 0 }]);
       setProofImage("");
       loadData();
+      toast.success("Catatan pengeluaran berhasil disimpan");
     } catch (err) {
       console.error(err);
-      alert("Gagal menambahkan pengeluaran.");
+      toast.error("Gagal menambahkan pengeluaran");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm("Apakah Anda yakin ingin menghapus pengeluaran ini?")) return;
+  const handleDelete = (id: string) => {
+    setDeleteId(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteId) return;
+    setDeleting(true);
     try {
-      await deleteDoc(doc(db, "expenses", id));
+      await deleteDoc(doc(db, "expenses", deleteId));
+      setDeleteId(null);
       loadData();
+      toast.success("Catatan pengeluaran berhasil dihapus");
     } catch (err) {
       console.error(err);
-      alert("Gagal menghapus.");
+      toast.error("Gagal menghapus catatan pengeluaran");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -315,6 +331,17 @@ export function ExpensesPage() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmModal
+        isOpen={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        onConfirm={confirmDelete}
+        title="Hapus Pengeluaran"
+        message="Apakah Anda yakin ingin menghapus catatan pengeluaran ini secara permanen dari sistem?"
+        confirmText="Hapus"
+        type="danger"
+        isLoading={deleting}
+      />
     </div>
   );
 }

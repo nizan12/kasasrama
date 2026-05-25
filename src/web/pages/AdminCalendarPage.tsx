@@ -24,6 +24,8 @@ export function AdminCalendarPage() {
           setDueDayOfWeek(-1); // Not applicable
         }
       }
+      // Add a small delay for smooth skeleton transition
+      await new Promise(resolve => setTimeout(resolve, 500));
     } catch (err) {
       console.error(err);
     } finally {
