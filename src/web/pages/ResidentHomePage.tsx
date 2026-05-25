@@ -648,7 +648,7 @@ export function ResidentHomePage() {
                         </div>
 
                         <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
-                          QRIS DINAMIS • AUTO-FEE 100% BEBAS BIAYA
+                          QRIS • AUTO-FEE 100% BEBAS BIAYA
                         </div>
                       </div>
                     </div>
