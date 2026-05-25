@@ -11,7 +11,7 @@ import {
   onAuthStateChanged,
   type User,
 } from "firebase/auth";
-import { doc, getDoc, setDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, query, where, getDocs, onSnapshot } from "firebase/firestore";
 import { auth, db } from "../firebase";
 
 export type UserRole = "admin" | "penghuni";
@@ -45,12 +45,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [logoUrl, setLogoUrl] = useState("");
 
-  // Load logo once on mount — available on login page and all protected pages
+  // Load logo settings with real-time sync
   useEffect(() => {
-    getDoc(doc(db, "settings", "config")).then((snap) => {
-      if (snap.exists()) setLogoUrl(snap.data().logoUrl || "");
-    }).catch(() => {});
+    const unsub = onSnapshot(doc(db, "settings", "config"), (snap) => {
+      if (snap.exists()) {
+        setLogoUrl(snap.data().logoUrl || "");
+      }
+    }, (err) => {
+      console.error("Failed to sync logoUrl settings:", err);
+    });
+    return unsub;
   }, []);
+
+  // Sync favicon with the custom logoUrl setting dynamically
+  useEffect(() => {
+    const link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
+    if (link) {
+      if (logoUrl) {
+        link.href = logoUrl;
+      } else {
+        // Fallback to default money-bag emoji SVG
+        link.href = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>";
+      }
+    }
+  }, [logoUrl]);
 
   // Load user profile from Firestore
   const loadProfile = async (u: User): Promise<UserProfile | null> => {
