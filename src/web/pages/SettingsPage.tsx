@@ -26,9 +26,11 @@ export function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [qrisError, setQrisError] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
+  const [backgroundUrl, setBackgroundUrl] = useState("");
   const [systemStartDate, setSystemStartDate] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const bgInputRef = useRef<HTMLInputElement>(null);
 
   const formatCurrency = (n: number) =>
     new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -44,6 +46,7 @@ export function SettingsPage() {
           setQrisString(d.qrisString || "");
           setQrisImage(d.qrisImage || "");
           setLogoUrl(d.logoUrl || "");
+          setBackgroundUrl(d.backgroundUrl || "");
           setFrequency((d.frequency as PaymentFrequency) || "monthly");
           setDueDay(d.dueDay ?? 10);
           setSystemStartDate(d.systemStartDate || "");
@@ -152,6 +155,7 @@ export function SettingsPage() {
         qrisString,
         qrisImage,
         logoUrl,
+        backgroundUrl,
         systemStartDate,
       });
       setSaved(true);
@@ -211,7 +215,48 @@ export function SettingsPage() {
     toast.info("Logo dihapus");
   };
 
+  const compressBackground = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 1920;
+        const scale = Math.min(MAX / img.width, MAX / img.height, 1);
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext("2d")!.clearRect(0, 0, w, h);
+        canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", 0.8)); // Use JPEG for large backgrounds
+      };
+      img.onerror = reject;
+      img.src = URL.createObjectURL(file);
+    });
 
+  const handleBgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { 
+      toast.warning("Ukuran file background maksimal 5MB"); 
+      return; 
+    }
+    try {
+      const compressed = await compressBackground(file);
+      setBackgroundUrl(compressed);
+      toast.success("Background berhasil diunggah");
+    } catch {
+      toast.error("Gagal memproses gambar background");
+    } finally {
+      if (bgInputRef.current) bgInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveBg = () => {
+    setBackgroundUrl("");
+    if (bgInputRef.current) bgInputRef.current.value = "";
+    toast.info("Background dihapus");
+  };
 
   return (
     <div className="space-y-6 pt-12 lg:pt-0 max-w-5xl fade-in">
@@ -482,6 +527,57 @@ export function SettingsPage() {
                     <p className="text-[11px] text-slate-400 font-semibold mt-0.5">PNG, JPG — Maks. 2MB</p>
                   </div>
                   <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+                </button>
+              )}
+            </div>
+
+            {/* Background Auth */}
+            <div className="premium-card p-6 space-y-4">
+              <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                Background Login & Register
+              </h2>
+              <p className="text-xs text-slate-500 font-medium">Gambar yang akan ditampilkan sebagai latar belakang di halaman Login dan Daftar. Maks. 5MB.</p>
+
+              {backgroundUrl ? (
+                <div className="flex items-center gap-4">
+                  <div className="w-24 h-16 rounded-xl border border-slate-200 overflow-hidden bg-slate-50 flex items-center justify-center flex-shrink-0">
+                    <img src={backgroundUrl} alt="Background" className="w-full h-full object-cover" />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <span className="text-xs text-emerald-600 font-bold flex items-center gap-1">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                      Background terpasang
+                    </span>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => bgInputRef.current?.click()} className="text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-xl border border-indigo-100 transition-all">
+                        Ganti Background
+                      </button>
+                      <button type="button" onClick={handleRemoveBg} className="text-xs font-bold text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-xl border border-rose-100 transition-all">
+                        Hapus
+                      </button>
+                    </div>
+                  </div>
+                  <input ref={bgInputRef} type="file" accept="image/*" onChange={handleBgUpload} className="hidden" />
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="w-full border-2 border-dashed border-slate-200 rounded-2xl py-6 flex flex-col items-center gap-2 hover:border-indigo-300 hover:bg-indigo-50/30 transition-all cursor-pointer"
+                  onClick={() => bgInputRef.current?.click()}
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm text-slate-700 font-bold">Upload Background Auth</p>
+                    <p className="text-[11px] text-slate-400 font-semibold mt-0.5">Maks. 5MB — Biarkan kosong untuk default</p>
+                  </div>
+                  <input ref={bgInputRef} type="file" accept="image/*" onChange={handleBgUpload} className="hidden" />
                 </button>
               )}
             </div>

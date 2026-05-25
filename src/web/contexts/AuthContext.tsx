@@ -28,6 +28,8 @@ interface AuthContextType {
   loading: boolean;
   logoUrl: string;
   logoLoading: boolean;
+  backgroundUrl: string;
+  backgroundLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -46,11 +48,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [logoUrl, setLogoUrl] = useState(() => localStorage.getItem("asrama_logo_cache") || "");
   const [logoLoading, setLogoLoading] = useState(() => !localStorage.getItem("asrama_logo_cache"));
+  const [backgroundUrl, setBackgroundUrl] = useState(() => localStorage.getItem("asrama_background_cache") || "");
+  const [backgroundLoading, setBackgroundLoading] = useState(() => !localStorage.getItem("asrama_background_cache"));
 
   // Load logo settings with real-time sync and caching optimization
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "settings", "config"), (snap) => {
       const firestoreLogo = snap.exists() ? (snap.data().logoUrl || "") : "";
+      const firestoreBackground = snap.exists() ? (snap.data().backgroundUrl || "") : "";
+      
       setLogoUrl((currentLogo) => {
         if (firestoreLogo !== currentLogo) {
           if (firestoreLogo) {
@@ -63,9 +69,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return currentLogo;
       });
       setLogoLoading(false);
+
+      setBackgroundUrl((currentBg) => {
+        if (firestoreBackground !== currentBg) {
+          if (firestoreBackground) {
+            localStorage.setItem("asrama_background_cache", firestoreBackground);
+          } else {
+            localStorage.removeItem("asrama_background_cache");
+          }
+          return firestoreBackground;
+        }
+        return currentBg;
+      });
+      setBackgroundLoading(false);
     }, (err) => {
-      console.error("Failed to sync logoUrl settings:", err);
+      console.error("Failed to sync settings:", err);
       setLogoLoading(false);
+      setBackgroundLoading(false);
     });
     return unsub;
   }, []);
@@ -177,7 +197,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, logoUrl, logoLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, profile, loading, logoUrl, logoLoading, backgroundUrl, backgroundLoading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

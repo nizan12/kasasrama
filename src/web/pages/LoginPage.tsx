@@ -8,7 +8,7 @@ export function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const { login, profile, user, logoUrl, logoLoading } = useAuth();
+  const { login, profile, user, logoUrl, logoLoading, backgroundUrl } = useAuth();
   const navigate = useNavigate();
 
   // Navigate as soon as profile is confirmed loaded after login
@@ -42,14 +42,27 @@ export function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-slate-50 via-[#f8fafc] to-indigo-50/40 relative overflow-hidden">
-      {/* Subtle light background glows */}
-      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-indigo-500/5 rounded-full blur-[100px]" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-500/5 rounded-full blur-[100px]" />
+    <div 
+      className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-slate-50 via-[#f8fafc] to-indigo-50/40 relative overflow-hidden"
+      style={backgroundUrl ? { backgroundImage: `url(${backgroundUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+    >
+      {!backgroundUrl && (
+        <>
+          <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-indigo-500/5 rounded-full blur-[100px]" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-500/5 rounded-full blur-[100px]" />
+        </>
+      )}
+      
+      {backgroundUrl && (
+        <div className="absolute inset-0 bg-slate-900/30" />
+      )}
 
-      <div className="w-full max-w-md relative z-10 space-y-8">
-        {/* Brand Header */}
-        <div className="text-center">
+      <div className="w-full max-w-md relative z-10">
+        {/* Login Form Card */}
+        <div className="premium-card p-8 bg-white/95 backdrop-blur-xl border border-slate-100 shadow-2xl shadow-slate-900/10 space-y-6">
+          
+          {/* Brand Header */}
+          <div className="text-center pb-2">
           {logoLoading ? (
             <div className="w-16 h-16 rounded-2xl mb-4 bg-slate-100 animate-pulse mx-auto border border-slate-200/50" />
           ) : logoUrl ? (
@@ -69,11 +82,9 @@ export function LoginPage() {
           <p className="text-slate-500 text-sm mt-1.5 font-medium">Sistem Pembayaran Kas Mandiri & QRIS Dinamis</p>
         </div>
 
-        {/* Login Form Card */}
-        <div className="premium-card p-8 bg-white border border-slate-100 shadow-xl shadow-slate-100/50 space-y-6">
-          {error && (
-            <div className="p-4 rounded-2xl text-sm bg-rose-50 border border-rose-100 text-rose-600 flex items-start gap-2.5">
-              <svg className="w-5 h-5 flex-shrink-0 text-rose-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        {error && (
+          <div className="p-4 rounded-2xl text-sm bg-rose-50 border border-rose-100 text-rose-600 flex items-start gap-2.5">
+            <svg className="w-5 h-5 flex-shrink-0 text-rose-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <span className="font-semibold">{error}</span>
@@ -161,9 +172,11 @@ export function LoginPage() {
           </div>
         </div>
 
-        <p className="text-center text-xs text-slate-400 font-medium">
-          Sistem Pembayaran Uang Kas Asrama Mandiri © 2026.
-        </p>
+        <div className="text-center mt-8">
+          <p className="inline-block text-xs font-semibold px-4 py-1.5 rounded-full bg-white/80 backdrop-blur-md border border-white/40 text-slate-600 shadow-sm">
+            Sistem Pembayaran Uang Kas Asrama Mandiri © 2026.
+          </p>
+        </div>
       </div>
     </div>
   );
