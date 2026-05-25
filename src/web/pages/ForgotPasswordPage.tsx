@@ -5,7 +5,7 @@ import { auth } from "../firebase";
 import { useAuth } from "../contexts/AuthContext";
 
 export function ForgotPasswordPage() {
-  const { logoUrl, logoLoading } = useAuth();
+  const { logoUrl, logoLoading, backgroundUrl } = useAuth();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
@@ -31,13 +31,25 @@ export function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-slate-50 via-[#f8fafc] to-indigo-50/40 relative overflow-hidden">
-      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-indigo-500/5 rounded-full blur-[100px]" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-500/5 rounded-full blur-[100px]" />
+    <div 
+      className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-slate-50 via-[#f8fafc] to-indigo-50/40 relative overflow-hidden"
+      style={backgroundUrl ? { backgroundImage: `url(${backgroundUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+    >
+      {!backgroundUrl && (
+        <>
+          <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-indigo-500/5 rounded-full blur-[100px]" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-500/5 rounded-full blur-[100px]" />
+        </>
+      )}
 
-      <div className="w-full max-w-md relative z-10 space-y-8 fade-in">
-        {/* Brand Header */}
-        <div className="text-center">
+      {backgroundUrl && (
+        <div className="absolute inset-0 bg-slate-900/30" />
+      )}
+
+      <div className="w-full max-w-md relative z-10 fade-in">
+        <div className="premium-card p-8 bg-white/95 backdrop-blur-xl border border-slate-100 shadow-2xl shadow-slate-900/10 space-y-6">
+          {/* Brand Header */}
+          <div className="text-center pb-2">
           {logoLoading ? (
             <div className="w-16 h-16 rounded-2xl mb-4 bg-slate-100 animate-pulse mx-auto border border-slate-200/50" />
           ) : logoUrl ? (
@@ -56,8 +68,6 @@ export function ForgotPasswordPage() {
             Masukkan email Anda dan kami akan mengirimkan link reset password
           </p>
         </div>
-
-        <div className="premium-card p-8 bg-white border border-slate-100 shadow-xl shadow-slate-100/50 space-y-6">
           {sent ? (
             <div className="text-center space-y-4">
               {/* Success state */}
@@ -124,9 +134,11 @@ export function ForgotPasswordPage() {
           </div>
         </div>
 
-        <p className="text-center text-xs text-slate-400 font-medium">
-          Sistem Pembayaran Uang Kas Asrama Mandiri © 2026.
-        </p>
+        <div className="text-center mt-8">
+          <p className="inline-block text-xs font-semibold px-4 py-1.5 rounded-full bg-white/80 backdrop-blur-md border border-white/40 text-slate-600 shadow-sm">
+            Sistem Pembayaran Uang Kas Asrama Mandiri © 2026.
+          </p>
+        </div>
       </div>
     </div>
   );
