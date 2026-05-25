@@ -142,7 +142,7 @@ export function Sidebar() {
           setResidentName(snap.data().name || "");
           setResidentAvatar(snap.data().avatar || "");
         }
-      }).catch(() => {});
+      }).catch(() => { });
     }
   }, [isAdmin, profile?.residentId]);
 
@@ -211,11 +211,10 @@ export function Sidebar() {
 
         {/* Role badge */}
         <div className="px-6 py-4 border-b border-slate-100/60 bg-slate-50/50">
-          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
-            isAdmin 
-              ? "bg-indigo-50 text-indigo-600 border-indigo-100" 
+          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${isAdmin
+              ? "bg-indigo-50 text-indigo-600 border-indigo-100"
               : "bg-emerald-50 text-emerald-600 border-emerald-100"
-          }`}>
+            }`}>
             <span className={`w-1.5 h-1.5 rounded-full ${isAdmin ? "bg-indigo-500" : "bg-emerald-500"}`} />
             {isAdmin ? "Administrator" : "Penghuni"}
           </span>
@@ -230,10 +229,9 @@ export function Sidebar() {
               end={item.path === "/" || item.path === "/beranda"}
               onClick={() => setMobileOpen(false)}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold transition-all duration-200 border ${
-                  isActive
-                    ? "bg-indigo-50/80 text-indigo-600 border-indigo-100/50 shadow-sm shadow-indigo-100/30"
-                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-800 border-transparent"
+                `flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold transition-all duration-200 border ${isActive
+                  ? "bg-indigo-50/80 text-indigo-600 border-indigo-100/50 shadow-sm shadow-indigo-100/30"
+                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-800 border-transparent"
                 }`
               }
             >

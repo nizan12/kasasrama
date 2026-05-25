@@ -30,6 +30,8 @@ interface AuthContextType {
   logoLoading: boolean;
   backgroundUrl: string;
   backgroundLoading: boolean;
+  sidebarBgUrl: string;
+  sidebarBgPosition: string;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -50,13 +52,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [logoLoading, setLogoLoading] = useState(() => !localStorage.getItem("asrama_logo_cache"));
   const [backgroundUrl, setBackgroundUrl] = useState(() => localStorage.getItem("asrama_background_cache") || "");
   const [backgroundLoading, setBackgroundLoading] = useState(() => !localStorage.getItem("asrama_background_cache"));
+  const [sidebarBgUrl, setSidebarBgUrl] = useState(() => localStorage.getItem("asrama_sidebar_bg_cache") || "");
+  const [sidebarBgPosition, setSidebarBgPosition] = useState(() => localStorage.getItem("asrama_sidebar_bg_pos_cache") || "50% 50%");
 
   // Load logo settings with real-time sync and caching optimization
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "settings", "config"), (snap) => {
       const firestoreLogo = snap.exists() ? (snap.data().logoUrl || "") : "";
       const firestoreBackground = snap.exists() ? (snap.data().backgroundUrl || "") : "";
-      
+
       setLogoUrl((currentLogo) => {
         if (firestoreLogo !== currentLogo) {
           if (firestoreLogo) {
@@ -82,6 +86,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return currentBg;
       });
       setBackgroundLoading(false);
+
+      const firestoreSidebarBg = snap.exists() ? (snap.data().sidebarBgUrl || "") : "";
+      setSidebarBgUrl((current) => {
+        if (firestoreSidebarBg !== current) {
+          if (firestoreSidebarBg) {
+            localStorage.setItem("asrama_sidebar_bg_cache", firestoreSidebarBg);
+          } else {
+            localStorage.removeItem("asrama_sidebar_bg_cache");
+          }
+          return firestoreSidebarBg;
+        }
+        return current;
+      });
+
+      const firestoreSidebarBgPos = snap.exists() ? (snap.data().sidebarBgPosition || "50% 50%") : "50% 50%";
+      setSidebarBgPosition((current) => {
+        if (firestoreSidebarBgPos !== current) {
+          localStorage.setItem("asrama_sidebar_bg_pos_cache", firestoreSidebarBgPos);
+          return firestoreSidebarBgPos;
+        }
+        return current;
+      });
     }, (err) => {
       console.error("Failed to sync settings:", err);
       setLogoLoading(false);
@@ -118,10 +144,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const firstDoc = emailSnap.docs[0];
       if (!emailSnap.empty && firstDoc) {
         const profileData = firstDoc.data() as UserProfile;
-        
+
         // Auto-migrate: save this profile under the correct UID for future logins
         await setDoc(doc(db, "users", u.uid), profileData);
-        
+
         return profileData;
       }
     }
@@ -197,7 +223,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, logoUrl, logoLoading, backgroundUrl, backgroundLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, profile, loading, logoUrl, logoLoading, backgroundUrl, backgroundLoading, sidebarBgUrl, sidebarBgPosition, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
