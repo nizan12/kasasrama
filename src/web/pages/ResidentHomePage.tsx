@@ -289,7 +289,7 @@ export function ResidentHomePage() {
     if (!profile?.residentId || submitting) return;
     
     if (!proofImage) {
-      alert("Harap unggah bukti pembayaran.");
+      toast.error("Harap unggah bukti pembayaran.");
       return;
     }
 
@@ -314,6 +314,7 @@ export function ResidentHomePage() {
       });
 
       setSuccess(true);
+      toast.success("Konfirmasi pembayaran dikirim ke admin");
       setPaymentStatus("pending");
       setNote("");
       setProofImage("");
@@ -413,9 +414,10 @@ export function ResidentHomePage() {
       window.dispatchEvent(new CustomEvent("profileUpdated", {
         detail: { name: editName.trim(), avatar: editAvatar },
       }));
+      toast.success("Profil berhasil diperbarui.");
     } catch (err) {
       console.error(err);
-      alert("Gagal memperbarui profil.");
+      toast.error("Gagal memperbarui profil.");
     } finally {
       setSavingProfile(false);
     }
