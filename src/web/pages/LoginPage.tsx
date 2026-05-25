@@ -8,7 +8,7 @@ export function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const { login, profile, user, logoUrl } = useAuth();
+  const { login, profile, user, logoUrl, logoLoading } = useAuth();
   const navigate = useNavigate();
 
   // Navigate as soon as profile is confirmed loaded after login
@@ -50,7 +50,9 @@ export function LoginPage() {
       <div className="w-full max-w-md relative z-10 space-y-8">
         {/* Brand Header */}
         <div className="text-center">
-          {logoUrl ? (
+          {logoLoading ? (
+            <div className="w-16 h-16 rounded-2xl mb-4 bg-slate-100 animate-pulse mx-auto border border-slate-200/50" />
+          ) : logoUrl ? (
             <img src={logoUrl} alt="Logo" className="w-16 h-16 object-contain mb-4 mx-auto block" />
           ) : (
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4 bg-gradient-to-tr from-indigo-600 to-violet-600 p-[1px] shadow-lg shadow-indigo-500/10">

@@ -27,6 +27,7 @@ interface AuthContextType {
   profile: UserProfile | null;
   loading: boolean;
   logoUrl: string;
+  logoLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -43,16 +44,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [logoUrl, setLogoUrl] = useState("");
+  const [logoUrl, setLogoUrl] = useState(() => localStorage.getItem("asrama_logo_cache") || "");
+  const [logoLoading, setLogoLoading] = useState(() => !localStorage.getItem("asrama_logo_cache"));
 
-  // Load logo settings with real-time sync
+  // Load logo settings with real-time sync and caching optimization
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "settings", "config"), (snap) => {
-      if (snap.exists()) {
-        setLogoUrl(snap.data().logoUrl || "");
-      }
+      const firestoreLogo = snap.exists() ? (snap.data().logoUrl || "") : "";
+      setLogoUrl((currentLogo) => {
+        if (firestoreLogo !== currentLogo) {
+          if (firestoreLogo) {
+            localStorage.setItem("asrama_logo_cache", firestoreLogo);
+          } else {
+            localStorage.removeItem("asrama_logo_cache");
+          }
+          return firestoreLogo;
+        }
+        return currentLogo;
+      });
+      setLogoLoading(false);
     }, (err) => {
       console.error("Failed to sync logoUrl settings:", err);
+      setLogoLoading(false);
     });
     return unsub;
   }, []);
@@ -143,7 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, logoUrl, login, logout }}>
+    <AuthContext.Provider value={{ user, profile, loading, logoUrl, logoLoading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

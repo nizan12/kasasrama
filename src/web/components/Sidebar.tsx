@@ -126,7 +126,7 @@ export function Sidebar() {
     }
     return () => clearTimeout(timeoutId);
   }, [mobileOpen]);
-  const { logout, user, profile, logoUrl } = useAuth();
+  const { logout, user, profile, logoUrl, logoLoading } = useAuth();
   const navigate = useNavigate();
 
   const isAdmin = profile?.role === "admin";
@@ -192,7 +192,9 @@ export function Sidebar() {
       >
         {/* Brand logo */}
         <div className="flex items-center gap-3.5 px-6 py-6 border-b border-slate-100">
-          {logoUrl ? (
+          {logoLoading ? (
+            <div className="w-9 h-9 rounded-xl bg-slate-100 animate-pulse flex-shrink-0 border border-slate-200/50" />
+          ) : logoUrl ? (
             <img src={logoUrl} alt="Logo" className="w-9 h-9 object-contain flex-shrink-0" />
           ) : (
             <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-gradient-to-tr from-indigo-600 to-violet-600 shadow-md shadow-indigo-600/10 flex-shrink-0">
