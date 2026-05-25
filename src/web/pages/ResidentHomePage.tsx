@@ -29,7 +29,7 @@ export function ResidentHomePage() {
   const [residentName, setResidentName] = useState("");
   const [room, setRoom] = useState("");
   const [avatar, setAvatar] = useState("");
-  
+
   const [baseFee, setBaseFee] = useState(0);
   const [dynamicFee, setDynamicFee] = useState(0);
   const [feeCount, setFeeCount] = useState(1);
@@ -90,7 +90,7 @@ export function ResidentHomePage() {
         canvas.height = height;
         const ctx = canvas.getContext("2d");
         ctx?.drawImage(img, 0, 0, width, height);
-        
+
         // Convert to base64 jpeg
         const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
         setProofImage(dataUrl);
@@ -150,14 +150,14 @@ export function ResidentHomePage() {
       // 4. Determine current period payment status
       const currentMonth = new Date().getMonth() + 1;
       const currentYear = new Date().getFullYear();
-      
-      const currentMonthPayments = payList.filter((p) => 
-        p.periodKey === currentPeriodKey || 
+
+      const currentMonthPayments = payList.filter((p) =>
+        p.periodKey === currentPeriodKey ||
         (p.month === currentMonth && p.year === currentYear)
       );
-      
+
       const totalConfirmedPaid = currentMonthPayments.filter(p => p.status === "confirmed").reduce((sum, p) => sum + Number(p.amount || 0), 0);
-      
+
       // Calculate accumulated outstanding:
       // Count how many billing points have passed UP TO AND INCLUDING TODAY
       const today = new Date();
@@ -202,11 +202,11 @@ export function ResidentHomePage() {
       // Accumulated outstanding = total due for passed weeks - total already paid
       const accumulatedDue = Math.max(0, passedBillingPoints * feePerPoint - totalConfirmedPaid);
       const remainingFee = accumulatedDue;
-      
+
       setTotalFeeThisMonth(feeInfo.fee);
       setTotalPaidThisMonth(totalConfirmedPaid);
       setDynamicFee(remainingFee); // Total outstanding for all passed billing points
-      
+
       if (remainingFee <= 0) {
         setPaymentStatus("confirmed");
       } else {
@@ -215,7 +215,7 @@ export function ResidentHomePage() {
           setPaymentStatus("pending");
         } else {
           setPaymentStatus("unpaid");
-          
+
           // 5. QRIS generation is now handled reactively by useEffect based on selected options
         }
       }
@@ -260,7 +260,7 @@ export function ResidentHomePage() {
       setQrCodeDataUrl("");
       return;
     }
-    
+
     let isMounted = true;
     const generateQR = async () => {
       try {
@@ -277,7 +277,7 @@ export function ResidentHomePage() {
         console.error("Failed generating QR", err);
       }
     };
-    
+
     generateQR();
     return () => {
       isMounted = false;
@@ -287,7 +287,7 @@ export function ResidentHomePage() {
   const handlePayConfirm = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile?.residentId || submitting) return;
-    
+
     if (!proofImage) {
       toast.error("Harap unggah bukti pembayaran.");
       return;
@@ -356,7 +356,7 @@ export function ResidentHomePage() {
         canvas.height = height;
         const ctx = canvas.getContext("2d");
         ctx?.drawImage(img, 0, 0, width, height);
-        
+
         const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
         setEditAvatar(dataUrl);
       };
@@ -370,7 +370,7 @@ export function ResidentHomePage() {
     setEditRoom(room);
     setEditAvatar(avatar);
     setShowProfileModal(true);
-    
+
     // Load rooms if not loaded
     if (rooms.length === 0) {
       try {
@@ -392,7 +392,7 @@ export function ResidentHomePage() {
     const handler = () => openProfileModal();
     window.addEventListener("openProfileModal", handler);
     return () => window.removeEventListener("openProfileModal", handler);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [residentName, room, avatar, rooms.length]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -430,8 +430,8 @@ export function ResidentHomePage() {
   // Compute next billing due date
   const getNextDueDate = (): string => {
     const now = new Date();
-    const monthNames = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
-    const dayNames = ["Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"];
+    const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+    const dayNames = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 
     if (frequency === "monthly") {
       let targetMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
@@ -565,11 +565,10 @@ export function ResidentHomePage() {
                         <button
                           type="button"
                           onClick={() => setPayFull(false)}
-                          className={`p-3.5 rounded-2xl border text-left transition-all ${
-                            !payFull 
-                              ? "bg-indigo-50/60 border-indigo-200 ring-2 ring-indigo-500/10" 
-                              : "bg-white border-slate-200 hover:border-slate-300"
-                          }`}
+                          className={`p-3.5 rounded-2xl border text-left transition-all ${!payFull
+                            ? "bg-indigo-50/60 border-indigo-200 ring-2 ring-indigo-500/10"
+                            : "bg-white border-slate-200 hover:border-slate-300"
+                            }`}
                         >
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
@@ -579,8 +578,8 @@ export function ResidentHomePage() {
                           </div>
                           <p className="text-base font-extrabold text-slate-800 mt-1">{formatCurrency(regularCycleAmount)}</p>
                           <p className="text-[10px] text-slate-500 font-semibold mt-0.5">
-                            {regularCycleAmount > feePerPoint 
-                              ? "Termasuk akumulasi tunggakan" 
+                            {regularCycleAmount > feePerPoint
+                              ? "Termasuk akumulasi tunggakan"
                               : `Seperti biasa per ${frequency === "weekly" ? "minggu" : frequency === "daily" ? "hari" : "bulan"}`}
                           </p>
                         </button>
@@ -588,11 +587,10 @@ export function ResidentHomePage() {
                         <button
                           type="button"
                           onClick={() => setPayFull(true)}
-                          className={`p-3.5 rounded-2xl border text-left transition-all ${
-                            payFull 
-                              ? "bg-indigo-50/60 border-indigo-200 ring-2 ring-indigo-500/10" 
-                              : "bg-white border-slate-200 hover:border-slate-300"
-                          }`}
+                          className={`p-3.5 rounded-2xl border text-left transition-all ${payFull
+                            ? "bg-indigo-50/60 border-indigo-200 ring-2 ring-indigo-500/10"
+                            : "bg-white border-slate-200 hover:border-slate-300"
+                            }`}
                         >
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Bayar Penuh</span>
@@ -624,12 +622,12 @@ export function ResidentHomePage() {
                         <img src={qrCodeDataUrl} alt="Dynamic QRIS" className="w-36 h-36 object-contain" />
                       </div>
                       <div className="space-y-2 text-center md:text-left min-w-0 flex-1">
-                        <h4 className="text-sm font-extrabold text-slate-800">Scan QRIS Dinamis</h4>
+                        <h4 className="text-sm font-extrabold text-slate-800">Scan QRIS</h4>
                         <p className="text-xs text-slate-500 leading-normal font-medium mb-3">
                           Scan menggunakan e-wallet (Gopay, OVO, Dana, LinkAja) atau Mobile Banking.
                           Nominal transfer otomatis terisi sebesar <span className="text-indigo-650 font-extrabold">{formatCurrency(selectedAmount)}</span>.
                         </p>
-                        
+
                         <div className="flex flex-col gap-1.5 mb-4 bg-white p-3 rounded-xl border border-slate-200 shadow-sm shadow-slate-50">
                           <div className="flex justify-between items-center text-xs">
                             <span className="text-slate-500 font-medium">Total Tagihan Bulan Ini</span>
@@ -763,7 +761,7 @@ export function ResidentHomePage() {
                     )}
                   </div>
                 ))}
-                
+
                 {history.length > 3 && (
                   <div className="pt-2 text-center">
                     <a href="/beranda/riwayat" className="text-xs font-bold text-indigo-600 hover:text-indigo-700 hover:underline">
@@ -823,7 +821,7 @@ export function ResidentHomePage() {
                 <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-3">
                   <span className="text-rose-600 font-extrabold text-sm">{formatCurrency(exp.amount)}</span>
                   {exp.proofImage && (
-                    <button 
+                    <button
                       onClick={() => setSelectedProof(exp.proofImage)}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold bg-white text-slate-600 border border-slate-200 hover:bg-slate-100 transition-colors shadow-sm"
                     >
@@ -868,13 +866,13 @@ export function ResidentHomePage() {
 
           <div className="space-y-2">
             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nama Lengkap</label>
-            <input 
-              type="text" 
-              value={editName} 
-              onChange={(e) => setEditName(e.target.value)} 
-              className="input-premium text-sm text-slate-800" 
-              placeholder="Nama lengkap Anda" 
-              required 
+            <input
+              type="text"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              className="input-premium text-sm text-slate-800"
+              placeholder="Nama lengkap Anda"
+              required
             />
           </div>
           <div className="space-y-2">
